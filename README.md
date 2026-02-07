@@ -33,6 +33,8 @@ Demonstrate the design and implementation of a secure voice communication system
 ## Documentation
 
 - [System Architecture](docs/architecture/system-architecture.md)
+- [Backend API](docs/api/backend-api.md)
+- [Backend Implementation](docs/implementation/backend-setup.md)
 - [Threat Model](docs/security/threat-model.md)
 - [Encryption Overview](docs/security/encryption-overview.md)
 - [Security Assumptions](docs/security/security-assumptions.md)
@@ -42,8 +44,11 @@ Demonstrate the design and implementation of a secure voice communication system
 ```
 secure-voice-call/
 │
+├── backend/          # NestJS signaling server
 ├── docs/
 │   ├── architecture/
+│   ├── api/
+│   ├── implementation/
 │   ├── security/
 │   └── research/
 │
