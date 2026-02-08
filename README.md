@@ -52,6 +52,39 @@ How to test
 2. Register two accounts and log in.
 3. Use the user list to initiate a call; accept on the other side.
 
+API Examples
+
+**Register a new user:**
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"secret123"}'
+```
+
+**Login:**
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"secret123"}'
+# Returns: { "accessToken": "JWT_TOKEN" }
+```
+
+**Get all users (requires auth):**
+```bash
+curl http://localhost:3000/api/v1/users \
+  -H "Authorization: Bearer JWT_TOKEN"
+```
+
+**Create a call:**
+```bash
+curl -X POST http://localhost:3000/api/v1/calls \
+  -H "Authorization: Bearer JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"calleeId":"USER_ID"}'
+```
+
+Full API reference: [docs/api/backend-api.md](docs/api/backend-api.md)
+
 Project structure (short)
 
 - backend/: NestJS server (auth, users, calls, ws gateway, Prisma client)
