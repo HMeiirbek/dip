@@ -53,6 +53,11 @@ class ApiService {
     return response.data;
   }
 
+  async getMe(): Promise<User> {
+    const response = await this.api.get<User>('/auth/me');
+    return response.data;
+  }
+
   logout(): void {
     this.token = null;
     localStorage.removeItem('accessToken');

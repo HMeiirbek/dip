@@ -14,7 +14,7 @@ export const App: React.FC = () => {
   // Call state
   const [callStatus, setCallStatus] = useState<CallStatusType>('idle');
   const [activeCall, setActiveCall] = useState<Call | null>(null);
-  const [incomingCall, setIncomingCall] = useState<RTCOfferData | null>(null);
+  const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
 
   // WebRTC state
@@ -38,11 +38,11 @@ export const App: React.FC = () => {
       const token = localStorage.getItem('accessToken');
       if (token) {
         try {
-          // Try to load current user (this requires a GET /auth/me endpoint)
-          // For now, we'll assume auth is valid if token exists
-          // In production, you'd want to validate the token
-          setCurrentUser({ id: '', username: '' });
+          // Fetch current user details with the stored token
+          const user = await apiService.getMe();
+          setCurrentUser(user);
         } catch (error) {
+          console.log('Token was invalid or expired, clearing');
           localStorage.removeItem('accessToken');
         }
       }
@@ -135,7 +135,14 @@ export const App: React.FC = () => {
     if (caller) {
       setRemoteUsername(caller.username);
     }
-    setIncomingCall(data);
+    const callObj: Call = {
+      id: data.id,
+      callerId: data.from,
+      calleeId: data.to,
+      status: 'created',
+      createdAt: new Date().toISOString(),
+    };
+    setIncomingCall(callObj);
     setCallStatus('incoming');
   };
 
@@ -153,18 +160,18 @@ export const App: React.FC = () => {
       await pc.setLocalDescription(answer);
 
       socketService.sendAnswer({
-        callId: incomingCall.callId,
+        callId: incomingCall.id,
         from: currentUser.id,
-        to: incomingCall.from,
+        to: incomingCall.callerId,
         answer: answer as RTCSessionDescriptionInit,
       });
 
       const callObj: Call = {
-        id: incomingCall.callId,
-        callerId: incomingCall.from,
+        id: incomingCall.id,
+        callerId: incomingCall.callerId,
         calleeId: currentUser.id,
         status: 'active',
-        createdAt: new Date().toISOString(),
+        createdAt: incomingCall.createdAt,
       };
       setActiveCall(callObj);
       setIncomingCall(null);
@@ -185,23 +192,33 @@ export const App: React.FC = () => {
     if (!currentUser) return;
 
     try {
+      console.log('📞 [initiateCall] Starting call to:', calleeId);
       setCallStatus('calling');
       const callee = await getUserDetails(calleeId);
       if (callee) {
+        console.log('📞 [initiateCall] Callee:', callee.username);
         setRemoteUsername(callee.username);
       }
 
       // Create call in backend
+      console.log('📞 [initiateCall] Creating call in backend...');
       const call = await apiService.createCall(calleeId);
+      console.log('✅ [initiateCall] Call created, id:', call.id);
       setActiveCall(call);
 
       // Setup WebRTC
+      console.log('📞 [initiateCall] Setting up WebRTC...');
       const pc = await setupWebRTC();
-      if (!pc) return;
+      if (!pc) {
+        console.error('❌ [initiateCall] WebRTC setup failed');
+        return;
+      }
 
       // Create and send offer
+      console.log('📞 [initiateCall] Creating offer...');
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      console.log('📞 [initiateCall] Sending offer via WebSocket...');
 
       socketService.sendOffer({
         callId: call.id,
@@ -209,8 +226,9 @@ export const App: React.FC = () => {
         to: calleeId,
         offer: offer as RTCSessionDescriptionInit,
       });
+      console.log('✅ [initiateCall] Offer sent');
     } catch (error) {
-      console.error('Error initiating call:', error);
+      console.error('❌ [initiateCall] Error:', error);
       setCallStatus('error');
     }
   };
@@ -245,12 +263,19 @@ export const App: React.FC = () => {
 
   // Setup socket listeners
   const setupSocketListeners = () => {
+    console.log('📡 [SocketListeners] Setting up WebRTC signal handlers');
+    
     socketService.onOffer(async (data: RTCOfferData) => {
-      if (!peerConnectionRef.current || !currentUser) return;
+      console.log('📬 [webrtc:offer] Received offer from:', data.from, 'callId:', data.callId);
+      if (!peerConnectionRef.current || !currentUser) {
+        console.warn('⚠️ [webrtc:offer] PC or currentUser not ready');
+        return;
+      }
 
       try {
         const offer = new RTCSessionDescription(data.offer);
         await peerConnectionRef.current.setRemoteDescription(offer);
+        console.log('✅ [webrtc:offer] Remote description set');
 
         // Get caller details
         const caller = await getUserDetails(data.from);
@@ -259,47 +284,64 @@ export const App: React.FC = () => {
         }
 
         // Signal incoming call
+        console.log('🔔 [webrtc:offer] Calling handleIncomingCall');
         handleIncomingCall({
           id: data.callId,
           from: data.from,
           to: data.to,
         });
       } catch (error) {
-        console.error('Error handling offer:', error);
+        console.error('❌ [webrtc:offer] Error:', error);
       }
     });
 
     socketService.onAnswer(async (data: RTCAnswerData) => {
-      if (!peerConnectionRef.current) return;
+      console.log('📬 [webrtc:answer] Received answer from:', data.from);
+      if (!peerConnectionRef.current) {
+        console.warn('⚠️ [webrtc:answer] PC not ready');
+        return;
+      }
 
       try {
         const answer = new RTCSessionDescription(data.answer);
         await peerConnectionRef.current.setRemoteDescription(answer);
+        console.log('✅ [webrtc:answer] Remote description set');
         setCallStatus('active');
       } catch (error) {
-        console.error('Error handling answer:', error);
+        console.error('❌ [webrtc:answer] Error:', error);
       }
     });
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {
-      if (!peerConnectionRef.current) return;
+      console.log('📬 [webrtc:ice] Received ICE candidate');
+      if (!peerConnectionRef.current) {
+        console.warn('⚠️ [webrtc:ice] PC not ready');
+        return;
+      }
 
       try {
         const candidate = new RTCIceCandidate(data.candidate);
         await peerConnectionRef.current.addIceCandidate(candidate);
       } catch (error) {
-        console.error('Error adding ICE candidate:', error);
+        console.error('❌ [webrtc:ice] Error:', error);
       }
     });
   };
 
   // Login handler
   const handleLogin = async (username: string) => {
-    // In a real app, you'd fetch the full user object from the server
-    const users = await apiService.getUsers();
-    const user = users.find((u) => u.username === username);
-    if (user) {
+    try {
+      // Get the current user details using the JWT token
+      const user = await apiService.getMe();
       setCurrentUser(user);
+    } catch (error) {
+      console.error('Failed to get user details after login:', error);
+      // If getMe fails, try the fallback method
+      const users = await apiService.getUsers();
+      const user = users.find((u) => u.username === username);
+      if (user) {
+        setCurrentUser(user);
+      }
     }
   };
 
@@ -357,7 +399,7 @@ export const App: React.FC = () => {
               <CallStatus
                 status={callStatus}
                 activeCall={activeCall}
-                incomingCall={null}
+                incomingCall={incomingCall}
                 remoteUsername={remoteUsername}
                 onAccept={acceptCall}
                 onReject={rejectCall}

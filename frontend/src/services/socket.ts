@@ -13,6 +13,12 @@ class SocketService {
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        console.log('🔌 [SocketService] Connecting to:', SOCKET_URL);
+        console.log('   Environment:', {
+          REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+        });
+
         this.socket = io(SOCKET_URL, {
           auth: {
             token,
@@ -24,12 +30,12 @@ class SocketService {
         });
 
         this.socket.on('connect', () => {
-          console.log('Socket connected');
+          console.log('✅ Socket connected, id:', this.socket?.id);
           resolve();
         });
 
         this.socket.on('connect_error', (error) => {
-          console.error('Socket connection error:', error);
+          console.error('❌ Socket connection error:', error);
           reject(error);
         });
       } catch (error) {

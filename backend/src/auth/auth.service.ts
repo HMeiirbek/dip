@@ -47,4 +47,10 @@ export class AuthService {
       accessToken: this.jwt.sign({ sub: user.id }),
     };
   }
+
+  async getUserById(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new UnauthorizedException();
+    return { id: user.id, username: user.username };
+  }
 }
