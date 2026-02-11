@@ -188,28 +188,28 @@ Full API documentation: [Backend API Reference](docs/api/backend-api.md)
 
 ```
 ┌─────────────────┐                    ┌──────────────────┐
-│  Browser (User A)│◄──── P2P/WebRTC ──►│ Browser (User B) │
+│ Browser (User A)│◄──── P2P/WebRTC ──►│ Browser (User B) │
 │   • React UI    │    DTLS/SRTP       │   • React UI     │
 │   • WebRTC      │   (Encrypted)      │   • WebRTC       │
 │   • Socket.io   │                    │   • Socket.io    │
 └────────┬────────┘                    └────────┬─────────┘
          │                                      │
          │    JSON Signaling (offers/answers)   │
-         │    Socket.io + REST                 │
-         └──────────────┬──────────────────────┘
+         │    Socket.io + REST                  │
+         └──────────────┬───────────────────────┘
                         │
-                   ┌────▼─────┐
+                   ┌────▼──────┐
                    │ NestJS    │
                    │ Server    │
                    │ (Routes   │
                    │Signaling) │
                    └────┬──────┘
                         │
-                   ┌────▼─────┐
+                   ┌────▼──────┐
                    │PostgreSQL │
                    │  (Calls & │
                    │  Metadata)│
-                   └──────────┘
+                   └───────────┘
 ```
 
 ### Component Details
