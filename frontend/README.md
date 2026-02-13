@@ -59,6 +59,21 @@ REACT_APP_API_URL=http://localhost:3000/api/v1
 REACT_APP_SOCKET_URL=http://localhost:3000
 ```
 
+## WebSocket Authentication
+
+The frontend must pass the JWT to the signaling server during the socket.io handshake. Example:
+
+```javascript
+import { io } from 'socket.io-client';
+
+const token = localStorage.getItem('accessToken');
+const socket = io(process.env.REACT_APP_SOCKET_URL, { auth: { token } });
+
+socket.on('connect', () => console.log('connected', socket.id));
+```
+
+This token is verified by the backend and used to map `userId` to the socket connection.
+
 ## Running the Application
 
 ### Development

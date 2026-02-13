@@ -12,12 +12,23 @@ model User {
   username  String   @unique
   password  String
   createdAt DateTime @default(now())
+  
+  callsInitiated Call[] @relation("CallerRelation")
+  callsReceived  Call[] @relation("CalleeRelation")
 }
 
 model Call {
   id        String   @id @default(uuid())
   callerId  String
   calleeId  String
-  status    String
+  caller    User     @relation("CallerRelation", fields: [callerId], references: [id])
+  callee    User     @relation("CalleeRelation", fields: [calleeId], references: [id])
+  status    String   @default("pending") // pending | accepted | rejected | active | ended
+  startedAt DateTime?
+  endedAt   DateTime?
+  expiresAt DateTime? // deadline for pending -> auto-reject
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  @@index([expiresAt], name: "expiresAt_idx")
 }

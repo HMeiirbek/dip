@@ -101,8 +101,8 @@ To use DIP from a mobile phone:
 2. **Update frontend API URL** (configure in `.env.local`):
    ```bash
    cd frontend
-   echo "REACT_APP_API_URL=http://YOUR_MACHINE_IP:3000/api/v1" >> .env.local
-   echo "REACT_APP_WS_URL=http://YOUR_MACHINE_IP:3000/ws" >> .env.local
+  echo "REACT_APP_API_URL=http://YOUR_MACHINE_IP:3000/api/v1" >> .env.local
+  echo "REACT_APP_SOCKET_URL=http://YOUR_MACHINE_IP:3000" >> .env.local
    ```
 
 3. **Access from mobile browser**: Open `http://YOUR_MACHINE_IP:3000` on your phone
@@ -128,7 +128,7 @@ If the frontend opens on your phone but login fails, follow these steps to debug
 ```bash
 # Example (replace with your IP):
 REACT_APP_API_URL=http://192.168.1.213:3000/api/v1
-REACT_APP_WS_URL=http://192.168.1.213:3000/ws
+REACT_APP_SOCKET_URL=http://192.168.1.213:3000
 ```
 
 3. Restart the frontend so it picks up the `.env.local` changes:
@@ -143,7 +143,25 @@ npm start
 
 5. Firewall / routing: ensure your host machine firewall allows inbound TCP on ports `3000` (backend) and `3001` (frontend dev server) or use `iptables`/ufw to open them.
 
-6. If WebSocket signaling fails, check the browser console for `ws` connection errors and ensure the `REACT_APP_WS_URL` is correct and reachable.
+6. If WebSocket signaling fails, check the browser console for `ws` connection errors and ensure the `REACT_APP_SOCKET_URL` is correct and reachable.
+
+### WebSocket Authentication
+
+The signaling server requires clients to authenticate their WebSocket connections with a JWT. Include the token in the socket.io handshake `auth` field. Example (frontend):
+
+```javascript
+// after login: store token in localStorage
+const token = localStorage.getItem('accessToken');
+const socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000', {
+  auth: { token },
+});
+
+socket.on('connect', () => console.log('socket connected', socket.id));
+```
+
+Server expectation (backend): the server reads `handshake.auth.token` or `handshake.query.token`, verifies the JWT, and maps the authenticated `userId` to the socket. This allows the server to send addressable notifications (for example, `call:incoming`) only to the intended recipient.
+
+If you use a different env var name, update both frontend `.env.local` and the README examples accordingly.
 
 7. If audio does not transmit: verify microphone permissions in the mobile browser and that WebRTC is supported (modern mobile browsers only).
 
@@ -188,28 +206,28 @@ Full API documentation: [Backend API Reference](docs/api/backend-api.md)
 
 ```
 ┌─────────────────┐                    ┌──────────────────┐
-│  Browser (User A)│◄──── P2P/WebRTC ──►│ Browser (User B) │
+│ Browser (User A)│◄──── P2P/WebRTC ──►│ Browser (User B) │
 │   • React UI    │    DTLS/SRTP       │   • React UI     │
 │   • WebRTC      │   (Encrypted)      │   • WebRTC       │
 │   • Socket.io   │                    │   • Socket.io    │
 └────────┬────────┘                    └────────┬─────────┘
          │                                      │
          │    JSON Signaling (offers/answers)   │
-         │    Socket.io + REST                 │
-         └──────────────┬──────────────────────┘
+         │    Socket.io + REST                  │
+         └──────────────┬───────────────────────┘
                         │
-                   ┌────▼─────┐
+                   ┌────▼──────┐
                    │ NestJS    │
                    │ Server    │
                    │ (Routes   │
                    │Signaling) │
                    └────┬──────┘
                         │
-                   ┌────▼─────┐
+                   ┌────▼──────┐
                    │PostgreSQL │
                    │  (Calls & │
                    │  Metadata)│
-                   └──────────┘
+                   └───────────┘
 ```
 
 ### Component Details

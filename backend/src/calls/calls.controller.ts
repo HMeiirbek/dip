@@ -8,19 +8,32 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CallsService } from './calls.service';
+import { CallEventsService } from './call-events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('calls')
 export class CallsController {
-  constructor(private calls: CallsService) {}
+  constructor(
+    private calls: CallsService,
+    private callEvents: CallEventsService,
+  ) {}
 
   @Post()
   async create(
     @Req() req: { user: { sub: string } },
     @Body('calleeId') calleeId: string,
   ) {
-    return this.calls.create(req.user.sub, calleeId);
+    const call = await this.calls.create(req.user.sub, calleeId);
+
+    // notify via server-side event so WsGateway can forward to callee if online
+    this.callEvents.emitIncoming({
+      callId: call.id,
+      callerId: call.callerId,
+      calleeId: call.calleeId,
+    });
+
+    return call;
   }
 
   @Get(':id')
@@ -31,11 +44,49 @@ export class CallsController {
     return this.calls.findById(id, req.user.sub);
   }
 
+  @Post(':id/accept')
+  async accept(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.calls.accept(id, req.user.sub);
+  }
+
+  @Post(':id/reject')
+  async reject(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.calls.reject(id, req.user.sub);
+  }
+
+  @Post(':id/active')
+  async markActive(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.calls.markActive(id, req.user.sub);
+  }
+
   @Post(':id/end')
   async end(
     @Req() req: { user: { sub: string } },
     @Param('id') id: string,
   ) {
     return this.calls.end(id, req.user.sub);
+  }
+
+  @Get('pending/me')
+  async getPending(
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.calls.getPendingCallForUser(req.user.sub);
+  }
+
+  @Get('active/me')
+  async getActive(
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.calls.getActiveCallForUser(req.user.sub);
   }
 }
