@@ -91,8 +91,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     const userId = this.socketUsers.get(client.id);
     if (userId) {
-      this.userSockets.delete(userId);
       this.socketUsers.delete(client.id);
+      const currentSocketId = this.userSockets.get(userId);
+      if (currentSocketId === client.id) {
+        this.userSockets.delete(userId);
+      }
       this.logger.log(`User ${userId} disconnected`);
       this.broadcastOnlineUsers();
     }

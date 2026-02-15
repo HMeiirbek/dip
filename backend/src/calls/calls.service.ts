@@ -12,7 +12,7 @@ export type CallStatus = 'pending' | 'accepted' | 'rejected' | 'active' | 'ended
 @Injectable()
 export class CallsService {
   private readonly CALL_RING_TIMEOUT = 30000; // 30 seconds
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(callerId: string, calleeId: string) {
     if (!calleeId?.trim()) {
@@ -31,12 +31,61 @@ export class CallsService {
       throw new BadRequestException('Cannot call yourself');
     }
 
-    // Check for active calls between these users
+    const now = new Date();
+
+    // Cleanup stale calls for this pair before checking active state
+    await this.prisma.call.updateMany({
+      where: {
+        OR: [
+          { callerId, calleeId },
+          { callerId: calleeId, calleeId: callerId },
+        ],
+        status: 'pending',
+        expiresAt: { lte: now },
+      },
+      data: {
+        status: 'rejected',
+        endedAt: now,
+      },
+    });
+
+    await this.prisma.call.updateMany({
+      where: {
+        OR: [
+          { callerId, calleeId },
+          { callerId: calleeId, calleeId: callerId },
+        ],
+        status: 'accepted',
+        expiresAt: { lte: now },
+      },
+      data: {
+        status: 'ended',
+        endedAt: now,
+      },
+    });
+
+    // Check for currently active calls between these users
     const activeCall = await this.prisma.call.findFirst({
       where: {
         OR: [
-          { callerId, calleeId, status: { in: ['pending', 'accepted', 'active'] } },
-          { callerId: calleeId, calleeId: callerId, status: { in: ['pending', 'accepted', 'active'] } },
+          {
+            callerId,
+            calleeId,
+            OR: [
+              { status: 'active' },
+              { status: 'pending', expiresAt: { gt: now } },
+              { status: 'accepted', expiresAt: { gt: now } },
+            ],
+          },
+          {
+            callerId: calleeId,
+            calleeId: callerId,
+            OR: [
+              { status: 'active' },
+              { status: 'pending', expiresAt: { gt: now } },
+              { status: 'accepted', expiresAt: { gt: now } },
+            ],
+          },
         ],
       },
     });

@@ -22,13 +22,15 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
   private async cleanupExpired() {
     try {
       const now = new Date();
-      const expired = await this.prisma.call.findMany({
+      const expiredPending = await this.prisma.call.findMany({
         where: { status: 'pending', expiresAt: { lte: now } },
       });
 
-      if (expired.length === 0) return;
+      const expiredAccepted = await this.prisma.call.findMany({
+        where: { status: 'accepted', expiresAt: { lte: now } },
+      });
 
-      for (const c of expired) {
+      for (const c of expiredPending) {
         await this.prisma.call.update({
           where: { id: c.id },
           data: { status: 'rejected', endedAt: new Date() },
@@ -41,6 +43,14 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
         } catch (e) {
           this.logger.debug('Failed to emit rejected event: ' + e?.message);
         }
+      }
+
+      for (const c of expiredAccepted) {
+        await this.prisma.call.update({
+          where: { id: c.id },
+          data: { status: 'ended', endedAt: new Date() },
+        });
+        this.logger.log(`Auto-ended stale accepted call ${c.id}`);
       }
     } catch (err) {
       this.logger.error('Error cleaning up expired calls: ' + err?.message || err);

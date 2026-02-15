@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import apiService from '../services/api';
 
 interface LoginFormProps {
-  onSuccess: (username: string) => void;
+  onSuccess: (token: string, username: string) => void;
   onError?: (error: string) => void;
 }
 
@@ -17,15 +17,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
     setIsLoading(true);
 
     try {
+      let authResponse;
       if (isRegister) {
         await apiService.register(username, password);
         // After registration, log in
-        await apiService.login(username, password);
+        authResponse = await apiService.login(username, password);
       } else {
-        await apiService.login(username, password);
+        authResponse = await apiService.login(username, password);
       }
 
-      onSuccess(username);
+      onSuccess(authResponse.accessToken, username);
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message ||

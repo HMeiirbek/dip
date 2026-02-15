@@ -5,7 +5,7 @@ import { CallButton } from './CallButton';
 
 interface UserListProps {
   currentUserId: string;
-  onCall: (userId: string) => void;
+  onCall: (userId: string) => Promise<void>;
   activeCallId: string | null;
 }
 

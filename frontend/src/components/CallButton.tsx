@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 interface CallButtonProps {
   userId: string;
   username: string;
-  onCall: (userId: string) => void;
+  onCall: (userId: string) => Promise<void>;
   isInCall: boolean;
 }
 
@@ -23,7 +23,7 @@ export const CallButton: React.FC<CallButtonProps> = ({
 
     setIsLoading(true);
     try {
-      onCall(userId);
+      await onCall(userId);
     } finally {
       setIsLoading(false);
     }

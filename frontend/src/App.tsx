@@ -10,17 +10,29 @@ import { User, Call, CallStatus as CallStatusType, RTCOfferData, RTCAnswerData, 
 export const App: React.FC = () => {
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const currentUserRef = useRef<User | null>(null);
 
   // Call state
   const [callStatus, setCallStatus] = useState<CallStatusType>('idle');
   const [activeCall, setActiveCall] = useState<Call | null>(null);
+  const activeCallRef = useRef<Call | null>(null);
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
 
   // WebRTC state
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   // Helper to get user details
   const getUserDetails = async (userId: string): Promise<User | null> => {
@@ -29,6 +41,16 @@ export const App: React.FC = () => {
     } catch (error) {
       console.error('Error getting user details:', error);
       return null;
+    }
+  };
+
+  const connectSocketWithToken = async (token: string) => {
+    try {
+      socketService.disconnect();
+      await socketService.connect(token);
+      setupSocketListeners();
+    } catch (error) {
+      console.error('Failed to connect to socket:', error);
     }
   };
 
@@ -41,6 +63,7 @@ export const App: React.FC = () => {
           // Fetch current user details with the stored token
           const user = await apiService.getMe();
           setCurrentUser(user);
+          await connectSocketWithToken(token);
         } catch (error) {
           console.log('Token was invalid or expired, clearing');
           localStorage.removeItem('accessToken');
@@ -49,34 +72,17 @@ export const App: React.FC = () => {
     };
 
     initializeAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Connect to socket when authenticated
   useEffect(() => {
-    if (!currentUser) return;
-
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
-    const connectSocket = async () => {
-      try {
-        await socketService.connect(token);
-        setupSocketListeners();
-      } catch (error) {
-        console.error('Failed to connect to socket:', error);
-      }
-    };
-
-    connectSocket();
-
     return () => {
       socketService.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
+  }, []);
 
   // Setup WebRTC
-  const setupWebRTC = async () => {
+  const setupWebRTC = async (call: Call, localUserId: string) => {
     try {
       // Get local audio stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -100,14 +106,14 @@ export const App: React.FC = () => {
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
-        if (event.candidate && activeCall) {
-          socketService.sendICECandidate({
-            callId: activeCall.id,
-            from: currentUser!.id,
-            to: activeCall.callerId === currentUser!.id ? activeCall.calleeId : activeCall.callerId,
-            candidate: event.candidate.toJSON(),
-          });
-        }
+        if (!event.candidate) return;
+        const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
+        socketService.sendICECandidate({
+          callId: call.id,
+          from: localUserId,
+          to: remoteUserId,
+          candidate: event.candidate.toJSON(),
+        });
       };
 
       // Handle connection state changes
@@ -123,6 +129,12 @@ export const App: React.FC = () => {
       return pc;
     } catch (error) {
       console.error('Error setting up WebRTC:', error);
+      if (!window.isSecureContext) {
+        console.error('WebRTC requires a secure context (HTTPS) on mobile browsers.');
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('MediaDevices API unavailable: getUserMedia is not supported here.');
+      }
       setCallStatus('error');
       return null;
     }
@@ -138,7 +150,7 @@ export const App: React.FC = () => {
     const callObj: Call = {
       id: data.id,
       callerId: data.from,
-      calleeId: data.to,
+      calleeId: data.to || currentUserRef.current?.id || '',
       status: 'created',
       createdAt: new Date().toISOString(),
     };
@@ -152,8 +164,29 @@ export const App: React.FC = () => {
 
     try {
       setCallStatus('active');
-      const pc = await setupWebRTC();
-      if (!pc) return;
+      const pc = await setupWebRTC(incomingCall, currentUser.id);
+      if (!pc) {
+        await apiService.rejectCall(incomingCall.id);
+        setIncomingCall(null);
+        setCallStatus('error');
+        return;
+      }
+
+      if (!pendingOfferRef.current) {
+        console.error('No pending remote offer when accepting call');
+        setCallStatus('error');
+        return;
+      }
+
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
+      pendingOfferRef.current = null;
+
+      while (pendingIceCandidatesRef.current.length > 0) {
+        const candidate = pendingIceCandidatesRef.current.shift();
+        if (candidate) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      }
 
       // Create and send answer
       const answer = await pc.createAnswer();
@@ -166,6 +199,19 @@ export const App: React.FC = () => {
         answer: answer as RTCSessionDescriptionInit,
       });
 
+      try {
+        await apiService.acceptCall(incomingCall.id);
+      } catch (error: any) {
+        // Do not fail the call setup if REST accept is transiently failing on mobile.
+        console.error('acceptCall API failed:', error?.response?.data || error?.message || error);
+      }
+
+      try {
+        await apiService.markCallActive(incomingCall.id);
+      } catch (error: any) {
+        console.error('markCallActive (callee side) failed:', error?.response?.data || error?.message || error);
+      }
+
       const callObj: Call = {
         id: incomingCall.id,
         callerId: incomingCall.callerId,
@@ -177,17 +223,105 @@ export const App: React.FC = () => {
       setIncomingCall(null);
     } catch (error) {
       console.error('Error accepting call:', error);
+      try {
+        await apiService.rejectCall(incomingCall.id);
+      } catch (rejectError) {
+        console.error('Error rejecting failed incoming call:', rejectError);
+      }
       setCallStatus('error');
     }
   };
 
   // Reject incoming call
-  const rejectCall = () => {
+  const rejectCall = async () => {
+    if (incomingCall) {
+      try {
+        await apiService.rejectCall(incomingCall.id);
+      } catch (error) {
+        console.error('Error rejecting call:', error);
+      }
+    }
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
     setIncomingCall(null);
     setCallStatus('idle');
   };
 
   // Initiate call
+  const assertWebRTCAvailable = () => {
+    if (!window.isSecureContext) {
+      throw new Error('WebRTC requires secure context. Open the app via HTTPS (or localhost).');
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('MediaDevices API is unavailable in this browser/context.');
+    }
+  };
+
+  const startOutgoingCall = async (calleeId: string, currentUserId: string) => {
+    // Do not create backend call if media capture cannot start.
+    assertWebRTCAvailable();
+
+    console.log('📞 [initiateCall] Creating call in backend...');
+    const call = await apiService.createCall(calleeId);
+    console.log('✅ [initiateCall] Call created, id:', call.id);
+    setActiveCall(call);
+
+    // Setup WebRTC
+    console.log('📞 [initiateCall] Setting up WebRTC...');
+    const pc = await setupWebRTC(call, currentUserId);
+    if (!pc) {
+      console.error('❌ [initiateCall] WebRTC setup failed');
+      await apiService.endCall(call.id);
+      setActiveCall(null);
+      return;
+    }
+
+    // Create and send offer
+    console.log('📞 [initiateCall] Creating offer...');
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    console.log('📞 [initiateCall] Sending offer via WebSocket...');
+
+    socketService.sendOffer({
+      callId: call.id,
+      from: currentUserId,
+      to: calleeId,
+      offer: offer as RTCSessionDescriptionInit,
+    });
+    console.log('✅ [initiateCall] Offer sent');
+  };
+
+  const releaseConflictingCall = async (calleeId: string, currentUserId: string): Promise<boolean> => {
+    let released = false;
+    const samePair = (call: Call | null) =>
+      !!call &&
+      ((call.callerId === currentUserId && call.calleeId === calleeId) ||
+        (call.callerId === calleeId && call.calleeId === currentUserId));
+
+    try {
+      const pending = await apiService.getPendingCallMe();
+      if (pending && samePair(pending)) {
+        await apiService.endCall(pending.id);
+        released = true;
+      }
+    } catch (error) {
+      console.error('Failed to release pending conflicting call:', error);
+    }
+
+    try {
+      const active = await apiService.getActiveCallMe();
+      if (active && samePair(active)) {
+        await apiService.endCall(active.id);
+        released = true;
+      }
+    } catch (error) {
+      console.error('Failed to release active conflicting call:', error);
+    }
+
+    return released;
+  };
+
   const initiateCall = async (calleeId: string) => {
     if (!currentUser) return;
 
@@ -200,35 +334,25 @@ export const App: React.FC = () => {
         setRemoteUsername(callee.username);
       }
 
-      // Create call in backend
-      console.log('📞 [initiateCall] Creating call in backend...');
-      const call = await apiService.createCall(calleeId);
-      console.log('✅ [initiateCall] Call created, id:', call.id);
-      setActiveCall(call);
+      await startOutgoingCall(calleeId, currentUser.id);
+    } catch (error) {
+      const err = error as any;
+      console.error('❌ [initiateCall] Error:', err);
+      console.error('❌ [initiateCall] Backend message:', err?.response?.data);
 
-      // Setup WebRTC
-      console.log('📞 [initiateCall] Setting up WebRTC...');
-      const pc = await setupWebRTC();
-      if (!pc) {
-        console.error('❌ [initiateCall] WebRTC setup failed');
-        return;
+      if (err?.response?.data?.message === 'There is already an active call between these users') {
+        const released = await releaseConflictingCall(calleeId, currentUser.id);
+        if (released) {
+          try {
+            console.log('🔄 [initiateCall] Retrying after releasing conflicting call');
+            await startOutgoingCall(calleeId, currentUser.id);
+            return;
+          } catch (retryError) {
+            console.error('❌ [initiateCall] Retry failed:', retryError);
+          }
+        }
       }
 
-      // Create and send offer
-      console.log('📞 [initiateCall] Creating offer...');
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      console.log('📞 [initiateCall] Sending offer via WebSocket...');
-
-      socketService.sendOffer({
-        callId: call.id,
-        from: currentUser.id,
-        to: calleeId,
-        offer: offer as RTCSessionDescriptionInit,
-      });
-      console.log('✅ [initiateCall] Offer sent');
-    } catch (error) {
-      console.error('❌ [initiateCall] Error:', error);
       setCallStatus('error');
     }
   };
@@ -258,6 +382,8 @@ export const App: React.FC = () => {
     setRemoteStream(null);
     setActiveCall(null);
     setRemoteUsername(null);
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
     setCallStatus('idle');
   };
 
@@ -267,15 +393,15 @@ export const App: React.FC = () => {
     
     socketService.onOffer(async (data: RTCOfferData) => {
       console.log('📬 [webrtc:offer] Received offer from:', data.from, 'callId:', data.callId);
-      if (!peerConnectionRef.current || !currentUser) {
-        console.warn('⚠️ [webrtc:offer] PC or currentUser not ready');
+      if (!currentUserRef.current) {
+        console.warn('⚠️ [webrtc:offer] currentUser not ready');
         return;
       }
 
       try {
-        const offer = new RTCSessionDescription(data.offer);
-        await peerConnectionRef.current.setRemoteDescription(offer);
-        console.log('✅ [webrtc:offer] Remote description set');
+        pendingOfferRef.current = data.offer;
+        pendingIceCandidatesRef.current = [];
+        console.log('✅ [webrtc:offer] Offer buffered until accept');
 
         // Get caller details
         const caller = await getUserDetails(data.from);
@@ -306,6 +432,18 @@ export const App: React.FC = () => {
         const answer = new RTCSessionDescription(data.answer);
         await peerConnectionRef.current.setRemoteDescription(answer);
         console.log('✅ [webrtc:answer] Remote description set');
+
+        while (pendingIceCandidatesRef.current.length > 0) {
+          const candidate = pendingIceCandidatesRef.current.shift();
+          if (candidate) {
+            await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+        }
+
+        if (activeCallRef.current) {
+          await apiService.markCallActive(activeCallRef.current.id);
+        }
+
         setCallStatus('active');
       } catch (error) {
         console.error('❌ [webrtc:answer] Error:', error);
@@ -314,8 +452,9 @@ export const App: React.FC = () => {
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {
       console.log('📬 [webrtc:ice] Received ICE candidate');
-      if (!peerConnectionRef.current) {
-        console.warn('⚠️ [webrtc:ice] PC not ready');
+      if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
+        pendingIceCandidatesRef.current.push(data.candidate);
+        console.log('🧊 [webrtc:ice] Candidate buffered');
         return;
       }
 
@@ -329,9 +468,9 @@ export const App: React.FC = () => {
   };
 
   // Login handler
-  const handleLogin = async (username: string) => {
+  const handleLogin = async (token: string, username: string) => {
     try {
-      // Get the current user details using the JWT token
+      await connectSocketWithToken(token);
       const user = await apiService.getMe();
       setCurrentUser(user);
     } catch (error) {
@@ -354,6 +493,8 @@ export const App: React.FC = () => {
     setIncomingCall(null);
     setRemoteStream(null);
     setLocalStream(null);
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
     setCallStatus('idle');
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();

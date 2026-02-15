@@ -7,6 +7,6 @@ import { CallCleanupService } from './call-cleanup.service';
 @Module({
   controllers: [CallsController],
   providers: [CallsService, CallEventsService, CallCleanupService],
-  exports: [CallEventsService],
+  exports: [CallsService, CallEventsService],
 })
 export class CallsModule {}

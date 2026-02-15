@@ -5,7 +5,11 @@ import {
   RTCICECandidateData,
 } from '../types';
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
+const getSocketUrl = () => {
+  if (process.env.REACT_APP_SOCKET_URL) return process.env.REACT_APP_SOCKET_URL;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3000';
+};
 
 class SocketService {
   private socket: Socket | null = null;
@@ -13,13 +17,14 @@ class SocketService {
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        console.log('🔌 [SocketService] Connecting to:', SOCKET_URL);
+        const socketUrl = getSocketUrl();
+        console.log('🔌 [SocketService] Connecting to:', socketUrl);
         console.log('   Environment:', {
           REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL,
           REACT_APP_API_URL: process.env.REACT_APP_API_URL,
         });
 
-        this.socket = io(SOCKET_URL, {
+        this.socket = io(socketUrl, {
           auth: {
             token,
           },
@@ -58,32 +63,65 @@ class SocketService {
   // WebRTC signaling methods
   sendOffer(data: RTCOfferData): void {
     if (!this.socket) return;
-    this.socket.emit('webrtc:offer', data);
+    this.socket.emit('webrtc:offer', {
+      callId: data.callId,
+      targetUserId: data.to,
+      offer: data.offer,
+    });
   }
 
   onOffer(callback: (data: RTCOfferData) => void): void {
     if (!this.socket) return;
-    this.socket.on('webrtc:offer', callback);
+    this.socket.on('webrtc:offer', (payload: any) => {
+      callback({
+        callId: payload.callId,
+        from: payload.senderId ?? payload.from,
+        to: payload.targetUserId ?? payload.to ?? '',
+        offer: payload.offer,
+      });
+    });
   }
 
   sendAnswer(data: RTCAnswerData): void {
     if (!this.socket) return;
-    this.socket.emit('webrtc:answer', data);
+    this.socket.emit('webrtc:answer', {
+      callId: data.callId,
+      targetUserId: data.to,
+      answer: data.answer,
+    });
   }
 
   onAnswer(callback: (data: RTCAnswerData) => void): void {
     if (!this.socket) return;
-    this.socket.on('webrtc:answer', callback);
+    this.socket.on('webrtc:answer', (payload: any) => {
+      callback({
+        callId: payload.callId,
+        from: payload.senderId ?? payload.from,
+        to: payload.targetUserId ?? payload.to ?? '',
+        answer: payload.answer,
+      });
+    });
   }
 
   sendICECandidate(data: RTCICECandidateData): void {
     if (!this.socket) return;
-    this.socket.emit('webrtc:ice-candidate', data);
+    this.socket.emit('webrtc:ice-candidate', {
+      callId: data.callId,
+      targetUserId: data.to,
+      candidate: data.candidate,
+    });
   }
 
   onICECandidate(callback: (data: RTCICECandidateData) => void): void {
     if (!this.socket) return;
-    this.socket.on('webrtc:ice-candidate', callback);
+    this.socket.on('webrtc:ice-candidate', (payload: any) => {
+      callback({
+        callId: payload.callId,
+        from: payload.senderId ?? payload.from,
+        to: payload.targetUserId ?? payload.to ?? '',
+        candidate: payload.candidate,
+      });
+    });
   }
 
   // Call notification events

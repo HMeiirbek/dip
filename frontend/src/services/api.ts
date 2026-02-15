@@ -6,7 +6,7 @@ import {
   Call,
 } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
 
 class ApiService {
   private api: AxiosInstance;
@@ -93,7 +93,32 @@ class ApiService {
   }
 
   async endCall(id: string): Promise<Call> {
-    const response = await this.api.put<Call>(`/calls/${id}/end`, {});
+    const response = await this.api.post<Call>(`/calls/${id}/end`, {});
+    return response.data;
+  }
+
+  async acceptCall(id: string): Promise<Call> {
+    const response = await this.api.post<Call>(`/calls/${id}/accept`, {});
+    return response.data;
+  }
+
+  async rejectCall(id: string): Promise<Call> {
+    const response = await this.api.post<Call>(`/calls/${id}/reject`, {});
+    return response.data;
+  }
+
+  async markCallActive(id: string): Promise<Call> {
+    const response = await this.api.post<Call>(`/calls/${id}/active`, {});
+    return response.data;
+  }
+
+  async getPendingCallMe(): Promise<Call | null> {
+    const response = await this.api.get<Call | null>('/calls/pending/me');
+    return response.data;
+  }
+
+  async getActiveCallMe(): Promise<Call | null> {
+    const response = await this.api.get<Call | null>('/calls/active/me');
     return response.data;
   }
 }
