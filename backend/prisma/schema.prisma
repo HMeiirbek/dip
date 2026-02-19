@@ -8,27 +8,129 @@ generator client {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  
+  id           String   @id @default(uuid())
+  username     String   @unique
+  password     String
+  email        String?  @unique
+  phone        String?  @unique
+  role         String   @default("user") // user | admin | moderator
+  trustScore   Int      @default(0)
+  isVerified   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   callsInitiated Call[] @relation("CallerRelation")
   callsReceived  Call[] @relation("CalleeRelation")
+  sessions       Session[]
+  reports        Report[]
+  notifications  Notification[]
+  securityLogs   SecurityLog[]
+  sentMessages   Message[]      @relation("MessageSenderRelation")
+  receivedMessages Message[]    @relation("MessageReceiverRelation")
 }
 
 model Call {
-  id        String   @id @default(uuid())
-  callerId  String
-  calleeId  String
-  caller    User     @relation("CallerRelation", fields: [callerId], references: [id])
-  callee    User     @relation("CalleeRelation", fields: [calleeId], references: [id])
-  status    String   @default("pending") // pending | accepted | rejected | active | ended
-  startedAt DateTime?
-  endedAt   DateTime?
-  expiresAt DateTime? // deadline for pending -> auto-reject
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
- 
+  id             String   @id @default(uuid())
+  callerId       String
+  calleeId       String
+  callerNumber   String?
+  receiverNumber String?
+  callTime       DateTime @default(now())
+  duration       Int?
+  riskScore      Int      @default(0)
+  caller         User     @relation("CallerRelation", fields: [callerId], references: [id])
+  callee         User     @relation("CalleeRelation", fields: [calleeId], references: [id])
+  status         String   @default("pending") // pending | accepted | rejected | active | ended
+  startedAt      DateTime?
+  endedAt        DateTime?
+  expiresAt      DateTime? // deadline for pending -> auto-reject
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  analysis       CallAnalysis[]
+
   @@index([expiresAt], name: "expiresAt_idx")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo   String?
+  ipAddress    String?
+  refreshToken String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}
+
+model CallAnalysis {
+  id          String   @id @default(uuid())
+  callId      String
+  call        Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  mlVersion   String
+  confidence  Float
+  riskFactors Json
+  createdAt   DateTime @default(now())
+}
+
+model Blacklist {
+  id          String   @id @default(uuid())
+  phoneNumber String   @unique
+  reason      String?
+  source      String   @default("user") // user | admin | system
+  createdAt   DateTime @default(now())
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String
+  description String?
+  status      String   @default("pending") // pending | approved | rejected
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  message    String
+  createdAt  DateTime @default(now())
+  sender     User     @relation("MessageSenderRelation", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("MessageReceiverRelation", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model SecurityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  device    String?
+  action    String
+  createdAt DateTime @default(now())
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     String   @default("info") // info | warning | error
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model MlModel {
+  id       String   @id @default(uuid())
+  version  String
+  accuracy Float
+  isActive Boolean  @default(false)
+  loadedAt DateTime @default(now())
 }

@@ -40,6 +40,34 @@ export class CallsController {
     return call;
   }
 
+  @ApiOperation({ summary: 'Check Number' })
+  @Post('check-number')
+  async checkNumber(@Body('phoneNumber') phoneNumber: string) {
+    return this.calls.checkNumber(phoneNumber);
+  }
+
+  @ApiOperation({ summary: 'Get Calls History' })
+  @Get('history')
+  async history(@Req() req: { user: { sub: string } }) {
+    return this.calls.history(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Report Number' })
+  @Post('report')
+  async report(
+    @Req() req: { user: { sub: string } },
+    @Body('phoneNumber') phoneNumber: string,
+    @Body('description') description?: string,
+  ) {
+    return this.calls.report(req.user.sub, phoneNumber, description);
+  }
+
+  @ApiOperation({ summary: 'Get Live Call' })
+  @Get('live')
+  async live(@Req() req: { user: { sub: string } }) {
+    return this.calls.live(req.user.sub);
+  }
+
   @ApiOperation({ summary: 'Accept Call' })
   @Post(':id/accept')
   async accept(
