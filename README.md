@@ -53,6 +53,14 @@ npm run start:dev
 
 **API Server**: `http://localhost:3000/api/v1`
 
+Optional backend security envs:
+```bash
+# comma-separated allowed origins
+export CORS_ORIGIN="http://localhost:3001,https://your-domain"
+# enforce HTTPS/WSS-only signaling (recommended in production)
+export ENFORCE_SECURE_SIGNALING="true"
+```
+
 ### 3. Start Frontend (React + WebRTC Client)
 
 Open a **new terminal** and run:
@@ -64,6 +72,15 @@ npm start
 ```
 
 **Frontend**: `http://localhost:3000` (or `3001` if port 3000 is in use)
+
+Optional WebRTC ICE/TURN envs (`frontend/.env.local`):
+```bash
+REACT_APP_STUN_URLS=stun:stun.l.google.com:19302
+# TURN over TLS 443 for restricted networks
+REACT_APP_TURN_URLS=turns:turn.example.com:443?transport=tcp
+REACT_APP_TURN_USERNAME=turn-user
+REACT_APP_TURN_CREDENTIAL=turn-password
+```
 
 ## Testing
 
@@ -200,6 +217,20 @@ curl -X POST http://localhost:3000/api/v1/calls \
 
 Full API documentation: [Backend API Reference](docs/api/backend-api.md)
 
+### Pilot Acceptance Report
+
+After running test calls/load, generate a measurable acceptance report from DB data:
+
+```bash
+cd backend
+npm run acceptance:report
+```
+
+The report includes:
+- call setup KPI (`p95`, `% <= 8s`)
+- quality KPI in last 24h (`RTT`, `jitter`, `packet loss`)
+- pass/partial status for pilot acceptance checks.
+
 ## Architecture
 
 ### System Overview
@@ -325,6 +356,54 @@ For comprehensive API documentation, see [Backend API Reference](docs/api/backen
 
 For detailed security analysis, see [Security Assumptions](docs/security/security-assumptions.md) and [Threat Model](docs/security/threat-model.md)
 
+## Pilot Baseline (v1)
+
+The following values are fixed for the pilot version and can be adjusted only after load testing.
+
+### Platform & Security Baseline
+
+- **Backend stack**: NestJS
+- **Signaling transport**: HTTPS/WSS only
+- **Signaling auth**: JWT + refresh token flow
+- **NAT traversal**: STUN + TURN, including TURN over TLS on port `443`
+- **Crypto minimums**:
+  - TLS `1.2+`
+  - DTLS `1.2`
+  - SRTP with `AES-GCM`
+- **E2EE**: optional (via WebRTC Insertable Streams)
+
+### Performance & Reliability Targets
+
+- **Concurrency target (`N`)**: `100` simultaneous calls per server instance
+- **Packet-loss tolerance (`Y`)**: up to `5%` without call drop
+- **Audio latency target**: `<= 200 ms` under target network conditions
+- **SLA availability**: `99.5%`
+- **RTO**: `<= 30 minutes`
+- **Retry policy**: reconnect attempts at `1s -> 2s -> 5s` with random jitter
+
+### Operational Requirements
+
+- Horizontal scaling must be supported (multiple signaling servers + load balancer)
+- Connection quality metrics must be collected:
+  - RTT
+  - jitter
+  - packet loss
+  - MOS-like score
+- Logging policy:
+  - log technical connection events, signaling errors, quality stats
+  - do not log raw audio payloads or direct PII
+  - apply PII masking and bounded retention
+
+### Pilot Acceptance Criteria
+
+- All signaling requests are accepted only via HTTPS/WSS
+- Audio session setup between clients is `<= 5-8s` in at least `95%` of attempts
+- Calls remain established with up to `5%` packet loss (quality degradation allowed)
+- TURN TLS `443` path works in restricted networks
+- No signaling access without a valid JWT
+- No downgrade to insecure protocol versions
+- Load test confirms stable operation at `100` parallel calls per instance
+
 ## Troubleshooting
 
 ### Issue: `Cannot find module 'react-scripts'`
@@ -377,6 +456,7 @@ docker-compose restart postgres
 ### For Security & Deployment
 - [Security Overview](docs/security/encryption-overview.md) — Encryption & security model
 - [Threat Model](docs/security/threat-model.md) — Threat analysis
+- [Privacy Audio Traffic Module Spec](docs/security/privacy-audio-traffic-module-spec.md) — Formal module requirements and pilot acceptance criteria
 - [Deployment Guide](deployment/local-setup.md) — Local deployment setup
 
 ### For Research
@@ -418,4 +498,3 @@ This repository is a research prototype. For license information, see the LICENS
 ---
 
 **Ready to get started?** Begin with [Quick Start](#quick-start) or read [Quick Start Guide](docs/quick-start.md) for detailed instructions.
-

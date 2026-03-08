@@ -31,7 +31,11 @@ class SocketService {
           reconnection: true,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
-          reconnectionAttempts: 5,
+          randomizationFactor: 0.3,
+          // 1s -> 2s -> up to 5s (+ randomizationFactor jitter)
+          reconnectionAttempts: 20,
+          timeout: 10000,
+          transports: ['websocket', 'polling'],
         });
 
         this.socket.on('connect', () => {

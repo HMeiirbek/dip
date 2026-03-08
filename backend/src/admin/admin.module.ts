@@ -4,9 +4,10 @@ import { AdminService } from './admin.service';
 import { AuthModule } from '../auth/auth.module';
 import { CallsModule } from '../calls/calls.module';
 import { BlacklistModule } from '../blacklist/blacklist.module';
+import { WsModule } from '../ws/ws.module';
 
 @Module({
-  imports: [AuthModule, CallsModule, BlacklistModule],
+  imports: [AuthModule, CallsModule, BlacklistModule, WsModule],
   controllers: [AdminController],
   providers: [AdminService],
 })
