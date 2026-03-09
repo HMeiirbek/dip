@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminService } from './admin.service';
@@ -50,6 +50,85 @@ export class AdminController {
     return this.admin.calls();
   }
 
+  @ApiOperation({ summary: 'Moderator Live Overview' })
+  @Roles('admin', 'moderator')
+  @Get('moderation/overview')
+  async moderationOverview() {
+    return this.admin.moderationOverview();
+  }
+
+  @ApiOperation({ summary: 'Call Quality History (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Get('calls/:id/quality-history')
+  async callQualityHistory(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.admin.callQualityHistory(id, Number(limit || 120));
+  }
+
+  @ApiOperation({ summary: 'List Call Flags (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Get('calls/flags')
+  async callFlags(
+    @Query('status') status?: 'open' | 'resolved' | 'all',
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('q') q?: string,
+    @Query('sortBy') sortBy?: 'createdAt' | 'status' | 'actorRole',
+    @Query('sortDir') sortDir?: 'asc' | 'desc',
+  ) {
+    return this.admin.callFlags({
+      status: status || 'open',
+      limit: Number(limit || 100),
+      offset: Number(offset || 0),
+      q: q || '',
+      sortBy: sortBy || 'createdAt',
+      sortDir: sortDir || 'desc',
+    });
+  }
+
+  @ApiOperation({ summary: 'Resolve Call Flag (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Post('calls/flags/:flagId/resolve')
+  async resolveCallFlag(
+    @Req() req: { user: { sub: string } },
+    @Param('flagId') flagId: string,
+  ) {
+    return this.admin.resolveCallFlag(flagId, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Resolve All Open Flags For Call (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Post('calls/:id/flags/resolve-all')
+  async resolveAllCallFlags(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.admin.resolveAllCallFlags(id, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Force End Active Call (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Post('calls/:id/force-end')
+  async forceEndCall(
+    @Req() req: { user: { sub: string; role?: string } },
+    @Param('id') id: string,
+  ) {
+    return this.admin.forceEndCall(id, req.user.sub, req.user.role || 'moderator');
+  }
+
+  @ApiOperation({ summary: 'Flag Call For Manual Review (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Post('calls/:id/flag')
+  async flagCall(
+    @Req() req: { user: { sub: string; role?: string } },
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.admin.flagCall(id, req.user.sub, req.user.role || 'moderator', reason);
+  }
+
   @ApiOperation({ summary: 'Admin Reports' })
   @Roles('admin', 'moderator')
   @Get('reports')
@@ -62,6 +141,13 @@ export class AdminController {
   @Get('analytics')
   async analytics() {
     return this.admin.analytics();
+  }
+
+  @ApiOperation({ summary: 'SLA / Acceptance Summary (Admin/Moderator)' })
+  @Roles('admin', 'moderator')
+  @Get('sla-summary')
+  async slaSummary() {
+    return this.admin.slaSummary();
   }
 
   @ApiOperation({ summary: 'Admin System Logs' })

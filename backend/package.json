@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "generate-certs": "node scripts/generate-certs.js"
+    "generate-certs": "node scripts/generate-certs.js",
+    "acceptance:report": "node scripts/acceptance_report.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

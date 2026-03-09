@@ -3,40 +3,23 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
 export type CallStatus = 'pending' | 'accepted' | 'rejected' | 'active' | 'ended';
+export type CallQualitySampleInput = {
+  rttMs?: number;
+  jitterMs?: number;
+  packetLossPct?: number;
+  mosLike?: number;
+  bitrateKbps?: number;
+};
 @Injectable()
-export class CallsService implements OnModuleInit {
+export class CallsService {
   private readonly CALL_RING_TIMEOUT = 30000; // 30 seconds
   constructor(private prisma: PrismaService) { }
-
-  async onModuleInit() {
-    await this.prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS risk_reports (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        phone_number TEXT NOT NULL,
-        description TEXT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-    await this.prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS risk_blacklist (
-        id TEXT PRIMARY KEY,
-        phone_number TEXT NOT NULL UNIQUE,
-        reason TEXT NULL,
-        source TEXT NOT NULL DEFAULT 'user',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-  }
 
   async create(callerId: string, calleeId: string) {
     if (!calleeId?.trim()) {
@@ -376,6 +359,34 @@ export class CallsService implements OnModuleInit {
         callee: { select: { id: true, username: true } },
       },
     });
+  }
+
+  async ingestQualitySample(callId: string, userId: string, sample: CallQualitySampleInput) {
+    const call = await this.findById(callId, userId);
+    if (!['pending', 'accepted', 'active'].includes(call.status)) {
+      throw new BadRequestException('Cannot ingest quality metrics for closed calls');
+    }
+
+    const clamp = (value: unknown, min: number, max: number) => {
+      if (typeof value !== 'number' || Number.isNaN(value)) return null;
+      return Math.max(min, Math.min(max, value));
+    };
+
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO call_quality_metrics
+        (id, call_id, user_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      crypto.randomUUID(),
+      callId,
+      userId,
+      clamp(sample.rttMs, 0, 60000),
+      clamp(sample.jitterMs, 0, 60000),
+      clamp(sample.packetLossPct, 0, 100),
+      clamp(sample.mosLike, 1, 5),
+      clamp(sample.bitrateKbps, 0, 100000),
+    );
+
+    return { success: true };
   }
 
   private setCallTimeout(callId: string, callerId: string) {

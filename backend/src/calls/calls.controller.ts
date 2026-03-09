@@ -95,6 +95,22 @@ export class CallsController {
     return this.calls.markActive(id, req.user.sub);
   }
 
+  @ApiOperation({ summary: 'Ingest Call Quality Sample' })
+  @Post(':id/quality')
+  async ingestQuality(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+    @Body() body: {
+      rttMs?: number;
+      jitterMs?: number;
+      packetLossPct?: number;
+      mosLike?: number;
+      bitrateKbps?: number;
+    },
+  ) {
+    return this.calls.ingestQualitySample(id, req.user.sub, body);
+  }
+
   @ApiOperation({ summary: 'End Call (Only For Tests)' })
   @Post(':id/end')
   async end(

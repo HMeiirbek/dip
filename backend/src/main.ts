@@ -24,7 +24,14 @@ async function bootstrap() {
   });
   app.useWebSocketAdapter(new IoAdapter(app));
   app.setGlobalPrefix('api/v1');
-  app.enableCors();
+  const corsOrigins = (process.env.CORS_ORIGIN || '*')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins.length === 1 && corsOrigins[0] === '*' ? true : corsOrigins,
+    credentials: true,
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DIP Backend API')

@@ -1,30 +1,89 @@
-import React, { useEffect, useState, useRef } from 'react';
-import apiService from './services/api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import apiService, { getAxiosErrorMessage } from './services/api';
 import socketService from './services/socket';
 import { LoginForm } from './components/LoginForm';
-import { UserList } from './components/UserList';
-import { CallStatus } from './components/CallStatus';
-import { AudioStream } from './components/AudioStream';
-import { User, Call, CallStatus as CallStatusType, RTCOfferData, RTCAnswerData, RTCICECandidateData } from './types';
+import { CallsPanel } from './components/CallsPanel';
+import { SecurityPanel } from './components/SecurityPanel';
+import { RiskPanel } from './components/RiskPanel';
+import { AdminPanel } from './components/AdminPanel';
+import { useControlCenterData } from './hooks/useControlCenterData';
+import {
+  User,
+  Call,
+  CallStatus as CallStatusType,
+  RTCOfferData,
+  RTCAnswerData,
+  RTCICECandidateData,
+} from './types';
+
+type TabKey = 'calls' | 'security' | 'risk' | 'admin';
+
+const parseCsv = (value?: string) =>
+  (value || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+const getIceServers = (): RTCIceServer[] => {
+  const json = process.env.REACT_APP_ICE_SERVERS_JSON;
+  if (json) {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch {
+      // fallback to env-based parsing below
+    }
+  }
+
+  const stunUrls = parseCsv(process.env.REACT_APP_STUN_URLS);
+  const turnUrls = parseCsv(process.env.REACT_APP_TURN_URLS);
+  const turnUsername = process.env.REACT_APP_TURN_USERNAME;
+  const turnCredential = process.env.REACT_APP_TURN_CREDENTIAL;
+
+  const servers: RTCIceServer[] = [];
+  if (stunUrls.length) {
+    servers.push({ urls: stunUrls });
+  } else {
+    servers.push({ urls: ['stun:stun.l.google.com:19302'] });
+  }
+
+  if (turnUrls.length && turnUsername && turnCredential) {
+    servers.push({
+      urls: turnUrls,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  }
+
+  return servers;
+};
 
 export const App: React.FC = () => {
-  // Auth state
+  const [activeTab, setActiveTab] = useState<TabKey>('calls');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const currentUserRef = useRef<User | null>(null);
 
-  // Call state
   const [callStatus, setCallStatus] = useState<CallStatusType>('idle');
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const activeCallRef = useRef<Call | null>(null);
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
 
-  // WebRTC state
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const qualityTimerRef = useRef<number | null>(null);
+  const qualityBytesRef = useRef<{ bytes: number; ts: number } | null>(null);
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
+  const [notice, setNotice] = useState<string>('');
+  const [error, setError] = useState<string>('');
+
+  const isAdminLike = useMemo(
+    () => currentUser?.role === 'admin' || currentUser?.role === 'moderator',
+    [currentUser],
+  );
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -34,12 +93,30 @@ export const App: React.FC = () => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
 
-  // Helper to get user details
+  const setMessage = (msg: string) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(''), 3500);
+  };
+
+  const setErrorMessage = (msg: string) => {
+    setError(msg);
+    setTimeout(() => setError(''), 5000);
+  };
+
+  const controlCenter = useControlCenterData({
+    currentUser,
+    isAdminLike,
+    setCurrentUser,
+    notify: setMessage,
+    notifyError: setErrorMessage,
+  });
+  const { security, risk, admin } = controlCenter;
+
   const getUserDetails = async (userId: string): Promise<User | null> => {
     try {
       return await apiService.getUser(userId);
-    } catch (error) {
-      console.error('Error getting user details:', error);
+    } catch (e) {
+      console.error('Error getting user details:', e);
       return null;
     }
   };
@@ -49,28 +126,24 @@ export const App: React.FC = () => {
       socketService.disconnect();
       await socketService.connect(token);
       setupSocketListeners();
-    } catch (error) {
-      console.error('Failed to connect to socket:', error);
+    } catch (e) {
+      console.error('Failed to connect socket:', e);
     }
   };
 
-  // Initialize handler
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('accessToken');
-      if (token) {
-        try {
-          // Fetch current user details with the stored token
-          const user = await apiService.getMe();
-          setCurrentUser(user);
-          await connectSocketWithToken(token);
-        } catch (error) {
-          console.log('Token was invalid or expired, clearing');
-          localStorage.removeItem('accessToken');
-        }
+      if (!token) return;
+      try {
+        const user = await apiService.getMe();
+        setCurrentUser(user);
+        await connectSocketWithToken(token);
+      } catch {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
       }
     };
-
     initializeAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -78,33 +151,48 @@ export const App: React.FC = () => {
   useEffect(() => {
     return () => {
       socketService.disconnect();
+      stopQualityReporter();
     };
   }, []);
 
-  // Setup WebRTC
+  useEffect(() => {
+    if (!currentUser) return;
+    if (activeTab === 'security') {
+      security.loadSecurityData();
+    }
+    if (activeTab === 'risk') {
+      risk.loadRiskData();
+    }
+    if (activeTab === 'admin') {
+      admin.loadAdminData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser, isAdminLike]);
+
+  useEffect(() => {
+    if (!currentUser || !isAdminLike || activeTab !== 'admin') return;
+    const id = window.setInterval(() => {
+      admin.loadAdminData();
+    }, 5000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser?.id, isAdminLike]);
+
   const setupWebRTC = async (call: Call, localUserId: string) => {
     try {
-      // Get local audio stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLocalStream(stream);
 
-      // Create peer connection
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
+        iceServers: getIceServers(),
       });
 
-      // Add local stream tracks
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
-      });
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      // Handle remote stream
       pc.ontrack = (event) => {
-        console.log('Received remote track:', event.track.kind);
         setRemoteStream(event.streams[0]);
       };
 
-      // Handle ICE candidates
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
         const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
@@ -116,37 +204,102 @@ export const App: React.FC = () => {
         });
       };
 
-      // Handle connection state changes
       pc.onconnectionstatechange = () => {
-        console.log('Connection state:', pc.connectionState);
         if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
           setCallStatus('ended');
+          stopQualityReporter();
           endCall();
         }
       };
 
       peerConnectionRef.current = pc;
       return pc;
-    } catch (error) {
-      console.error('Error setting up WebRTC:', error);
-      if (!window.isSecureContext) {
-        console.error('WebRTC requires a secure context (HTTPS) on mobile browsers.');
-      }
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error('MediaDevices API unavailable: getUserMedia is not supported here.');
-      }
+    } catch (e) {
+      console.error('Error setting up WebRTC:', e);
       setCallStatus('error');
       return null;
     }
   };
 
-  // Handle incoming call
-  const handleIncomingCall = async (data: any) => {
-    console.log('Incoming call:', data);
-    const caller = await getUserDetails(data.from);
-    if (caller) {
-      setRemoteUsername(caller.username);
+  const stopQualityReporter = () => {
+    if (qualityTimerRef.current !== null) {
+      window.clearInterval(qualityTimerRef.current);
+      qualityTimerRef.current = null;
     }
+    qualityBytesRef.current = null;
+  };
+
+  const collectQualitySample = async (pc: RTCPeerConnection) => {
+    const stats = await pc.getStats();
+    let rttMs: number | undefined;
+    let jitterMs: number | undefined;
+    let packetLossPct: number | undefined;
+    let bitrateKbps: number | undefined;
+
+    stats.forEach((report) => {
+      const asAny = report as any;
+      if (report.type === 'candidate-pair' && asAny.state === 'succeeded') {
+        if (typeof asAny.currentRoundTripTime === 'number') {
+          rttMs = Math.round(asAny.currentRoundTripTime * 1000);
+        }
+      }
+
+      if (report.type === 'inbound-rtp' && asAny.kind === 'audio') {
+        if (typeof asAny.jitter === 'number') {
+          jitterMs = Math.round(asAny.jitter * 1000);
+        }
+        const lost = typeof asAny.packetsLost === 'number' ? asAny.packetsLost : 0;
+        const received = typeof asAny.packetsReceived === 'number' ? asAny.packetsReceived : 0;
+        const total = lost + received;
+        if (total > 0) {
+          packetLossPct = Number(((lost / total) * 100).toFixed(2));
+        }
+
+        if (typeof asAny.bytesReceived === 'number') {
+          const now = Date.now();
+          const prev = qualityBytesRef.current;
+          if (prev && now > prev.ts) {
+            const deltaBytes = Math.max(0, asAny.bytesReceived - prev.bytes);
+            const deltaSec = (now - prev.ts) / 1000;
+            bitrateKbps = Number((((deltaBytes * 8) / 1000) / deltaSec).toFixed(2));
+          }
+          qualityBytesRef.current = { bytes: asAny.bytesReceived, ts: now };
+        }
+      }
+    });
+
+    const safeRtt = rttMs ?? 80;
+    const safeJitter = jitterMs ?? 12;
+    const safeLoss = packetLossPct ?? 0.5;
+    const penalty = (safeRtt / 300) + (safeJitter / 120) + (safeLoss / 12);
+    const mosLike = Number(Math.max(1, Math.min(5, 5 - penalty)).toFixed(2));
+
+    return {
+      rttMs,
+      jitterMs,
+      packetLossPct,
+      mosLike,
+      bitrateKbps,
+    };
+  };
+
+  const startQualityReporter = (callId: string) => {
+    stopQualityReporter();
+    qualityTimerRef.current = window.setInterval(async () => {
+      if (!peerConnectionRef.current) return;
+      try {
+        const sample = await collectQualitySample(peerConnectionRef.current);
+        await apiService.submitCallQuality(callId, sample);
+      } catch {
+        // ignore transient stats/network errors during call quality reporting
+      }
+    }, 5000);
+  };
+
+  const handleIncomingCall = async (data: { id: string; from: string; to?: string }) => {
+    const caller = await getUserDetails(data.from);
+    if (caller) setRemoteUsername(caller.username);
+
     const callObj: Call = {
       id: data.id,
       callerId: data.from,
@@ -158,7 +311,6 @@ export const App: React.FC = () => {
     setCallStatus('incoming');
   };
 
-  // Accept incoming call
   const acceptCall = async () => {
     if (!incomingCall || !currentUser) return;
 
@@ -173,7 +325,6 @@ export const App: React.FC = () => {
       }
 
       if (!pendingOfferRef.current) {
-        console.error('No pending remote offer when accepting call');
         setCallStatus('error');
         return;
       }
@@ -188,7 +339,6 @@ export const App: React.FC = () => {
         }
       }
 
-      // Create and send answer
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -199,18 +349,8 @@ export const App: React.FC = () => {
         answer: answer as RTCSessionDescriptionInit,
       });
 
-      try {
-        await apiService.acceptCall(incomingCall.id);
-      } catch (error: any) {
-        // Do not fail the call setup if REST accept is transiently failing on mobile.
-        console.error('acceptCall API failed:', error?.response?.data || error?.message || error);
-      }
-
-      try {
-        await apiService.markCallActive(incomingCall.id);
-      } catch (error: any) {
-        console.error('markCallActive (callee side) failed:', error?.response?.data || error?.message || error);
-      }
+      await apiService.acceptCall(incomingCall.id);
+      await apiService.markCallActive(incomingCall.id);
 
       const callObj: Call = {
         id: incomingCall.id,
@@ -221,24 +361,18 @@ export const App: React.FC = () => {
       };
       setActiveCall(callObj);
       setIncomingCall(null);
-    } catch (error) {
-      console.error('Error accepting call:', error);
-      try {
-        await apiService.rejectCall(incomingCall.id);
-      } catch (rejectError) {
-        console.error('Error rejecting failed incoming call:', rejectError);
-      }
+    } catch (e) {
+      console.error('Error accepting call:', e);
       setCallStatus('error');
     }
   };
 
-  // Reject incoming call
   const rejectCall = async () => {
     if (incomingCall) {
       try {
         await apiService.rejectCall(incomingCall.id);
-      } catch (error) {
-        console.error('Error rejecting call:', error);
+      } catch (e) {
+        console.error('Error rejecting call:', e);
       }
     }
     pendingOfferRef.current = null;
@@ -247,41 +381,29 @@ export const App: React.FC = () => {
     setCallStatus('idle');
   };
 
-  // Initiate call
   const assertWebRTCAvailable = () => {
     if (!window.isSecureContext) {
-      throw new Error('WebRTC requires secure context. Open the app via HTTPS (or localhost).');
+      throw new Error('WebRTC requires secure context. Open via HTTPS or localhost.');
     }
-
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('MediaDevices API is unavailable in this browser/context.');
+      throw new Error('MediaDevices API unavailable.');
     }
   };
 
   const startOutgoingCall = async (calleeId: string, currentUserId: string) => {
-    // Do not create backend call if media capture cannot start.
     assertWebRTCAvailable();
-
-    console.log('📞 [initiateCall] Creating call in backend...');
     const call = await apiService.createCall(calleeId);
-    console.log('✅ [initiateCall] Call created, id:', call.id);
     setActiveCall(call);
 
-    // Setup WebRTC
-    console.log('📞 [initiateCall] Setting up WebRTC...');
     const pc = await setupWebRTC(call, currentUserId);
     if (!pc) {
-      console.error('❌ [initiateCall] WebRTC setup failed');
       await apiService.endCall(call.id);
       setActiveCall(null);
       return;
     }
 
-    // Create and send offer
-    console.log('📞 [initiateCall] Creating offer...');
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    console.log('📞 [initiateCall] Sending offer via WebSocket...');
 
     socketService.sendOffer({
       callId: call.id,
@@ -289,7 +411,6 @@ export const App: React.FC = () => {
       to: calleeId,
       offer: offer as RTCSessionDescriptionInit,
     });
-    console.log('✅ [initiateCall] Offer sent');
   };
 
   const releaseConflictingCall = async (calleeId: string, currentUserId: string): Promise<boolean> => {
@@ -305,9 +426,7 @@ export const App: React.FC = () => {
         await apiService.endCall(pending.id);
         released = true;
       }
-    } catch (error) {
-      console.error('Failed to release pending conflicting call:', error);
-    }
+    } catch {}
 
     try {
       const active = await apiService.getActiveCallMe();
@@ -315,9 +434,7 @@ export const App: React.FC = () => {
         await apiService.endCall(active.id);
         released = true;
       }
-    } catch (error) {
-      console.error('Failed to release active conflicting call:', error);
-    }
+    } catch {}
 
     return released;
   };
@@ -326,54 +443,37 @@ export const App: React.FC = () => {
     if (!currentUser) return;
 
     try {
-      console.log('📞 [initiateCall] Starting call to:', calleeId);
       setCallStatus('calling');
       const callee = await getUserDetails(calleeId);
-      if (callee) {
-        console.log('📞 [initiateCall] Callee:', callee.username);
-        setRemoteUsername(callee.username);
-      }
-
+      if (callee) setRemoteUsername(callee.username);
       await startOutgoingCall(calleeId, currentUser.id);
-    } catch (error) {
-      const err = error as any;
-      console.error('❌ [initiateCall] Error:', err);
-      console.error('❌ [initiateCall] Backend message:', err?.response?.data);
-
-      if (err?.response?.data?.message === 'There is already an active call between these users') {
+    } catch (e: unknown) {
+      const maybeAxios = e as { response?: { data?: { message?: string } } };
+      const message = maybeAxios?.response?.data?.message;
+      if (message === 'There is already an active call between these users') {
         const released = await releaseConflictingCall(calleeId, currentUser.id);
         if (released) {
-          try {
-            console.log('🔄 [initiateCall] Retrying after releasing conflicting call');
-            await startOutgoingCall(calleeId, currentUser.id);
-            return;
-          } catch (retryError) {
-            console.error('❌ [initiateCall] Retry failed:', retryError);
-          }
+          await startOutgoingCall(calleeId, currentUser.id);
+          return;
         }
       }
-
       setCallStatus('error');
+      setErrorMessage(getAxiosErrorMessage(e));
     }
   };
 
-  // End call
   const endCall = async () => {
     if (!activeCall) return;
-
+    stopQualityReporter();
     try {
       await apiService.endCall(activeCall.id);
-    } catch (error) {
-      console.error('Error ending call:', error);
-    }
+    } catch {}
 
-    // Clean up WebRTC
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
 
-    // Stop local stream
     if (localStream) {
       localStream.getTracks().forEach((track) => track.stop());
       setLocalStream(null);
@@ -387,105 +487,109 @@ export const App: React.FC = () => {
     setCallStatus('idle');
   };
 
-  // Setup socket listeners
+  useEffect(() => {
+    if (callStatus === 'active' && activeCall?.id && peerConnectionRef.current) {
+      startQualityReporter(activeCall.id);
+      return;
+    }
+    stopQualityReporter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callStatus, activeCall?.id]);
+
   const setupSocketListeners = () => {
-    console.log('📡 [SocketListeners] Setting up WebRTC signal handlers');
-    
+    socketService.offOffer();
+    socketService.offAnswer();
+    socketService.offICECandidate();
+    socketService.offCallEnded();
+
     socketService.onOffer(async (data: RTCOfferData) => {
-      console.log('📬 [webrtc:offer] Received offer from:', data.from, 'callId:', data.callId);
-      if (!currentUserRef.current) {
-        console.warn('⚠️ [webrtc:offer] currentUser not ready');
-        return;
-      }
+      if (!currentUserRef.current) return;
+      pendingOfferRef.current = data.offer;
+      pendingIceCandidatesRef.current = [];
 
-      try {
-        pendingOfferRef.current = data.offer;
-        pendingIceCandidatesRef.current = [];
-        console.log('✅ [webrtc:offer] Offer buffered until accept');
+      const caller = await getUserDetails(data.from);
+      if (caller) setRemoteUsername(caller.username);
 
-        // Get caller details
-        const caller = await getUserDetails(data.from);
-        if (caller) {
-          setRemoteUsername(caller.username);
-        }
-
-        // Signal incoming call
-        console.log('🔔 [webrtc:offer] Calling handleIncomingCall');
-        handleIncomingCall({
-          id: data.callId,
-          from: data.from,
-          to: data.to,
-        });
-      } catch (error) {
-        console.error('❌ [webrtc:offer] Error:', error);
-      }
+      handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
     });
 
     socketService.onAnswer(async (data: RTCAnswerData) => {
-      console.log('📬 [webrtc:answer] Received answer from:', data.from);
-      if (!peerConnectionRef.current) {
-        console.warn('⚠️ [webrtc:answer] PC not ready');
-        return;
-      }
-
+      if (!peerConnectionRef.current) return;
       try {
-        const answer = new RTCSessionDescription(data.answer);
-        await peerConnectionRef.current.setRemoteDescription(answer);
-        console.log('✅ [webrtc:answer] Remote description set');
-
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
         while (pendingIceCandidatesRef.current.length > 0) {
           const candidate = pendingIceCandidatesRef.current.shift();
           if (candidate) {
             await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
           }
         }
-
         if (activeCallRef.current) {
           await apiService.markCallActive(activeCallRef.current.id);
         }
-
         setCallStatus('active');
-      } catch (error) {
-        console.error('❌ [webrtc:answer] Error:', error);
+      } catch (e) {
+        console.error(e);
       }
     });
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {
-      console.log('📬 [webrtc:ice] Received ICE candidate');
       if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
         pendingIceCandidatesRef.current.push(data.candidate);
-        console.log('🧊 [webrtc:ice] Candidate buffered');
         return;
       }
-
       try {
-        const candidate = new RTCIceCandidate(data.candidate);
-        await peerConnectionRef.current.addIceCandidate(candidate);
-      } catch (error) {
-        console.error('❌ [webrtc:ice] Error:', error);
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } catch (e) {
+        console.error(e);
       }
+    });
+
+    socketService.onCallEnded(async (data: { callId: string; reason?: string }) => {
+      if (!activeCallRef.current || activeCallRef.current.id !== data.callId) {
+        return;
+      }
+      stopQualityReporter();
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      setLocalStream((prev) => {
+        prev?.getTracks().forEach((track) => track.stop());
+        return null;
+      });
+      setRemoteStream(null);
+      setIncomingCall(null);
+      setActiveCall(null);
+      setRemoteUsername(null);
+      pendingOfferRef.current = null;
+      pendingIceCandidatesRef.current = [];
+      setCallStatus('ended');
+      setMessage(`Call ended: ${data.reason || 'remote end'}`);
+      window.setTimeout(() => setCallStatus('idle'), 1200);
     });
   };
 
-  // Login handler
   const handleLogin = async (token: string, username: string) => {
     try {
       await connectSocketWithToken(token);
       const user = await apiService.getMe();
       setCurrentUser(user);
-    } catch (error) {
-      console.error('Failed to get user details after login:', error);
-      // If getMe fails, try the fallback method
-      const users = await apiService.getUsers();
-      const user = users.find((u) => u.username === username);
-      if (user) {
+      setMessage(`Logged in as ${user.username}`);
+    } catch (e) {
+      try {
+        const users = await apiService.getUsers();
+        const user = users.find((u) => u.username === username) || null;
         setCurrentUser(user);
+      } catch {
+        setErrorMessage('Login completed but failed to fetch user profile');
       }
     }
   };
 
-  // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiService.logoutRequest(false);
+    } catch {}
     apiService.logout();
     socketService.disconnect();
     setCurrentUser(null);
@@ -496,169 +600,371 @@ export const App: React.FC = () => {
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
     setCallStatus('idle');
+    stopQualityReporter();
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
   };
 
+  const handleRefreshAuth = async () => {
+    try {
+      const refreshed = await apiService.refreshAuth();
+      await connectSocketWithToken(refreshed.accessToken);
+      const user = await apiService.getMe();
+      setCurrentUser(user);
+      setMessage('Access token refreshed');
+    } catch (e) {
+      setErrorMessage(getAxiosErrorMessage(e));
+    }
+  };
+
   if (!currentUser) {
-    return <LoginForm onSuccess={handleLogin} />
+    return <LoginForm onSuccess={handleLogin} />;
   }
 
   return (
     <div style={styles.app}>
       <div style={styles.container}>
-        {/* Header */}
         <div style={styles.header}>
           <div>
-            <h1 style={styles.appTitle}>🔐 DIP</h1>
-            <p style={styles.appSubtitle}>Secure Voice Communication</p>
+            <h1 style={styles.appTitle}>DIP Control Center</h1>
+            <p style={styles.appSubtitle}>Calls, security, risk and admin tools</p>
           </div>
-          <div>
-            <span style={styles.username}>👤 {currentUser.username}</span>
-            <button onClick={handleLogout} style={styles.logoutButton}>
-              Logout
-            </button>
-          </div>
-        </div>
-
-        {/* Main content */}
-        <div style={styles.content}>
-          {/* Left: Users list */}
-          <div style={styles.leftPanel}>
-            <UserList
-              currentUserId={currentUser.id}
-              onCall={initiateCall}
-              activeCallId={activeCall?.id || null}
-            />
-          </div>
-
-          {/* Right: Call status and audio */}
-          <div style={styles.rightPanel}>
-            <div style={styles.statusSection}>
-              <CallStatus
-                status={callStatus}
-                activeCall={activeCall}
-                incomingCall={incomingCall}
-                remoteUsername={remoteUsername}
-                onAccept={acceptCall}
-                onReject={rejectCall}
-                onEnd={endCall}
-              />
-            </div>
-
-            {(callStatus === 'active' || callStatus === 'calling') && (
-              <div style={styles.audioSection}>
-                <div style={styles.audioGrid}>
-                  <AudioStream
-                    stream={localStream}
-                    isMuted={true}
-                    label="Your Audio (Local)"
-                  />
-                  <AudioStream
-                    stream={remoteStream}
-                    isMuted={false}
-                    label="Remote Audio"
-                  />
-                </div>
-              </div>
-            )}
+          <div style={styles.headerActions}>
+            <span style={styles.username}>
+              {currentUser.username} {currentUser.role ? `(${currentUser.role})` : ''}
+            </span>
+            <button onClick={handleRefreshAuth} style={styles.secondaryButton}>Refresh Token</button>
+            <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
           </div>
         </div>
+
+        <div style={styles.tabBar}>
+          <button style={tabStyle(activeTab === 'calls')} onClick={() => setActiveTab('calls')}>Calls</button>
+          <button style={tabStyle(activeTab === 'security')} onClick={() => setActiveTab('security')}>Security</button>
+          <button style={tabStyle(activeTab === 'risk')} onClick={() => setActiveTab('risk')}>Risk</button>
+          <button style={tabStyle(activeTab === 'admin')} onClick={() => setActiveTab('admin')}>Admin</button>
+        </div>
+
+        {notice && <div style={styles.notice}>{notice}</div>}
+        {error && <div style={styles.error}>{error}</div>}
+
+        {activeTab === 'calls' && (
+          <CallsPanel
+            currentUserId={currentUser.id}
+            onCall={initiateCall}
+            activeCallId={activeCall?.id || null}
+            callStatus={callStatus}
+            activeCall={activeCall}
+            incomingCall={incomingCall}
+            remoteUsername={remoteUsername}
+            onAccept={acceptCall}
+            onReject={rejectCall}
+            onEnd={endCall}
+            localStream={localStream}
+            remoteStream={remoteStream}
+          />
+        )}
+
+        {activeTab === 'security' && (
+          <SecurityPanel
+            securitySessions={security.securitySessions}
+            securityActivity={security.securityActivity}
+            verifyCode={security.verifyCode}
+            setVerifyCode={security.setVerifyCode}
+            resetIdentifier={security.resetIdentifier}
+            setResetIdentifier={security.setResetIdentifier}
+            resetCode={security.resetCode}
+            setResetCode={security.setResetCode}
+            newPassword={security.newPassword}
+            setNewPassword={security.setNewPassword}
+            onRequestVerify={security.handleVerifyRequest}
+            onVerify={security.handleVerifySubmit}
+            onRefreshSecurity={security.loadSecurityData}
+            onTerminateSession={security.terminateSession}
+            onRequestResetCode={security.handleForgotPassword}
+            onResetPassword={security.handleResetPassword}
+          />
+        )}
+
+        {activeTab === 'risk' && (
+          <RiskPanel
+            riskAnalysis={risk.riskAnalysis}
+            riskMonitor={risk.riskMonitor}
+            riskStats={risk.riskStats}
+            checkPhone={risk.checkPhone}
+            setCheckPhone={risk.setCheckPhone}
+            checkPhoneResult={risk.checkPhoneResult}
+            reportPhone={risk.reportPhone}
+            setReportPhone={risk.setReportPhone}
+            reportDescription={risk.reportDescription}
+            setReportDescription={risk.setReportDescription}
+            onReloadRisk={risk.loadRiskData}
+            onCheckNumber={risk.handleCheckNumber}
+            onReportNumber={risk.handleReportNumber}
+          />
+        )}
+
+        {activeTab === 'admin' && (
+          <AdminPanel
+            isAdminLike={isAdminLike}
+            role={currentUser.role}
+            adminDashboard={admin.adminDashboard}
+            adminAnalytics={admin.adminAnalytics}
+            adminSlaSummary={admin.adminSlaSummary}
+            adminReports={admin.adminReports}
+            adminLogs={admin.adminLogs}
+            adminUsers={admin.adminUsers}
+            mlStatus={admin.mlStatus}
+            mlMetrics={admin.mlMetrics}
+            adminLoading={admin.adminLoading}
+            moderatorOverview={admin.moderatorOverview}
+            callFlags={admin.callFlags}
+            callFlagsStatus={admin.callFlagsStatus}
+            setCallFlagsStatus={admin.setCallFlagsStatus}
+            callFlagsQuery={admin.callFlagsQuery}
+            setCallFlagsQuery={admin.setCallFlagsQuery}
+            callFlagsOffset={admin.callFlagsOffset}
+            setCallFlagsOffset={admin.setCallFlagsOffset}
+            callFlagsLimit={admin.callFlagsLimit}
+            callFlagsTotal={admin.callFlagsTotal}
+            callFlagsSortBy={admin.callFlagsSortBy}
+            setCallFlagsSortBy={admin.setCallFlagsSortBy}
+            callFlagsSortDir={admin.callFlagsSortDir}
+            setCallFlagsSortDir={admin.setCallFlagsSortDir}
+            blacklist={admin.blacklist}
+            blacklistPhone={admin.blacklistPhone}
+            setBlacklistPhone={admin.setBlacklistPhone}
+            blacklistReason={admin.blacklistReason}
+            setBlacklistReason={admin.setBlacklistReason}
+            onReloadAdmin={admin.loadAdminData}
+            onReloadMl={admin.handleReloadMl}
+            onAddBlacklist={admin.handleAddBlacklist}
+            onDeleteBlacklist={admin.deleteBlacklist}
+            onUpdateUserRole={admin.updateRole}
+            onForceEndCall={admin.forceEndCall}
+            onFlagCall={admin.flagCall}
+            onResolveCallFlag={admin.resolveCallFlag}
+            onResolveAllFlagsForCall={admin.resolveAllFlagsForCall}
+          />
+        )}
       </div>
     </div>
   );
 };
 
-const styles = {
+const tabStyle = (active: boolean): React.CSSProperties => ({
+  padding: '10px 16px',
+  borderRadius: 8,
+  border: active ? '2px solid #0c6cff' : '1px solid #d0d0d0',
+  background: active ? '#ebf3ff' : '#fff',
+  fontWeight: 600,
+  cursor: 'pointer',
+});
+
+const styles: Record<string, React.CSSProperties> = {
   app: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '20px',
-  } as React.CSSProperties,
-
+    background: 'linear-gradient(160deg, #f2f7ff 0%, #f8fff4 100%)',
+    padding: 16,
+  },
   container: {
-    maxWidth: '1200px',
+    maxWidth: 1280,
     margin: '0 auto',
-  } as React.CSSProperties,
-
+  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: 'white',
-    padding: '20px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-  } as React.CSSProperties,
-
+    background: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+  },
+  headerActions: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+  },
   appTitle: {
-    color: '#667eea',
     margin: 0,
-    fontSize: '28px',
-  } as React.CSSProperties,
-
+    fontSize: 28,
+    color: '#0f1f44',
+  },
   appSubtitle: {
-    color: '#888',
-    margin: '5px 0 0 0',
-    fontSize: '12px',
-  } as React.CSSProperties,
-
+    margin: '4px 0 0 0',
+    fontSize: 13,
+    color: '#4f5d7a',
+  },
+  tabBar: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  notice: {
+    background: '#e8fff1',
+    border: '1px solid #8ce7ae',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    color: '#0f6d35',
+    fontWeight: 600,
+  },
+  error: {
+    background: '#ffeff0',
+    border: '1px solid #ff9fa6',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    color: '#a01828',
+    fontWeight: 600,
+  },
   username: {
-    color: '#666',
-    marginRight: '15px',
-    fontSize: '14px',
-    fontWeight: '500',
-  } as React.CSSProperties,
-
+    marginRight: 6,
+    fontWeight: 600,
+  },
   logoutButton: {
-    padding: '8px 16px',
-    background: '#e74c3c',
-    color: 'white',
+    padding: '8px 12px',
+    borderRadius: 8,
     border: 'none',
-    borderRadius: '6px',
+    background: '#d6223b',
+    color: '#fff',
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  } as React.CSSProperties,
-
+    fontWeight: 700,
+  },
+  primaryButton: {
+    padding: '8px 12px',
+    borderRadius: 8,
+    border: 'none',
+    background: '#0c6cff',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+  secondaryButton: {
+    padding: '8px 12px',
+    borderRadius: 8,
+    border: '1px solid #b5c3de',
+    background: '#fff',
+    color: '#1a3369',
+    cursor: 'pointer',
+    fontWeight: 700,
+  },
+  smallButton: {
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: '1px solid #b5c3de',
+    background: '#fff',
+    cursor: 'pointer',
+    fontWeight: 700,
+    fontSize: 12,
+  },
+  smallDanger: {
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: 'none',
+    background: '#d6223b',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 700,
+    fontSize: 12,
+  },
   content: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '20px',
-  } as React.CSSProperties,
-
+    gap: 12,
+  },
   leftPanel: {
-    minHeight: '400px',
-  } as React.CSSProperties,
-
+    minHeight: 360,
+  },
   rightPanel: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '20px',
-  } as React.CSSProperties,
-
+    flexDirection: 'column',
+    gap: 12,
+  },
   statusSection: {
     display: 'flex',
-    justifyContent: 'center',
-    minHeight: '200px',
     alignItems: 'center',
-  } as React.CSSProperties,
-
-  audioSection: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '20px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-  } as React.CSSProperties,
-
+    justifyContent: 'center',
+    minHeight: 220,
+  },
+  card: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+  },
+  cardTitle: {
+    marginTop: 0,
+    marginBottom: 10,
+  },
   audioGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '15px',
-  } as React.CSSProperties,
+    gap: 10,
+  },
+  grid2: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+  },
+  row: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  input: {
+    padding: '8px 10px',
+    border: '1px solid #c5d1e8',
+    borderRadius: 8,
+    minWidth: 180,
+  },
+  listBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    maxHeight: 260,
+    overflowY: 'auto',
+    border: '1px solid #e5ebf5',
+    borderRadius: 8,
+    padding: 8,
+    background: '#fbfdff',
+  },
+  listItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    borderBottom: '1px solid #eef2f9',
+    paddingBottom: 6,
+  },
+  listItemColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    borderBottom: '1px solid #eef2f9',
+    paddingBottom: 6,
+  },
+  pre: {
+    background: '#0d1117',
+    color: '#c9d1d9',
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 12,
+    overflowX: 'auto',
+    maxHeight: 240,
+    overflowY: 'auto',
+  },
 };
 
 export default App;
