@@ -58,7 +58,7 @@ export const UserList: React.FC<UserListProps> = ({
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>👥 Users Online ({otherUsers.length})</h2>
+      <h2 style={styles.title}>Users Online ({otherUsers.length})</h2>
 
       {otherUsers.length === 0 ? (
         <div style={styles.empty}>No other users available</div>
@@ -86,40 +86,43 @@ export const UserList: React.FC<UserListProps> = ({
 
 const styles = {
   container: {
-    background: 'white',
+    background: 'var(--surface)',
     borderRadius: '12px',
     padding: '20px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
   } as React.CSSProperties,
 
   title: {
-    color: '#333',
+    color: 'var(--text)',
     marginBottom: '15px',
     fontSize: '18px',
     fontWeight: '600',
   } as React.CSSProperties,
 
   error: {
-    color: '#e74c3c',
+    color: 'var(--text)',
     padding: '10px',
-    background: '#fadbd8',
+    background: 'rgba(214, 34, 59, 0.12)',
+    border: '1px solid rgba(214, 34, 59, 0.35)',
     borderRadius: '6px',
     marginBottom: '10px',
   } as React.CSSProperties,
 
   retryButton: {
     padding: '8px 16px',
-    background: '#667eea',
+    background: 'var(--primary)',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: 800,
   } as React.CSSProperties,
 
   empty: {
     textAlign: 'center' as const,
-    color: '#999',
+    color: 'var(--muted)',
     padding: '20px',
     fontSize: '14px',
   } as React.CSSProperties,
@@ -135,9 +138,9 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px',
-    background: '#f8f9fa',
+    background: 'var(--surface2)',
     borderRadius: '8px',
-    border: '1px solid #e9ecef',
+    border: '1px solid var(--border)',
   } as React.CSSProperties,
 
   userInfo: {
@@ -152,6 +155,6 @@ const styles = {
 
   username: {
     fontWeight: '500',
-    color: '#333',
+    color: 'var(--text)',
   } as React.CSSProperties,
 };

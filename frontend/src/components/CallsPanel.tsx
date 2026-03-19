@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Call, CallStatus as CallStatusType } from '../types';
 import { UserList } from './UserList';
 import { CallStatus } from './CallStatus';
@@ -33,8 +33,9 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   localStream,
   remoteStream,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 840px)');
   return (
-    <div style={styles.content}>
+    <div style={{ ...styles.content, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
       <div style={styles.leftPanel}>
         <UserList
           currentUserId={currentUserId}
@@ -74,6 +75,27 @@ const styles: Record<string, React.CSSProperties> = {
   leftPanel: { minHeight: 360 },
   rightPanel: { display: 'flex', flexDirection: 'column', gap: 12 },
   statusSection: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220 },
-  card: { background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' },
+  card: { background: 'var(--surface)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)', border: '1px solid var(--border)' },
   audioGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
 };
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    }
+    mql.addListener(onChange);
+    return () => mql.removeListener(onChange);
+  }, [query]);
+
+  return matches;
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { SecurityActivityItem, SecuritySession } from '../types';
 
 interface SecurityPanelProps {
@@ -38,8 +38,9 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   onRequestResetCode,
   onResetPassword,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 840px)');
   return (
-    <div style={styles.grid2}>
+    <div style={{ ...styles.grid2, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
       <div style={styles.card}>
         <h3 style={styles.cardTitle}>Verification & Sessions</h3>
         <div style={styles.row}>
@@ -111,33 +112,54 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
-  card: { background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' },
+  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
+  card: { background: 'var(--surface)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)', border: '1px solid var(--border)' },
   cardTitle: { marginTop: 0, marginBottom: 10 },
   row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
   stack: { display: 'flex', flexDirection: 'column', gap: 8 },
-  input: { padding: '8px 10px', border: '1px solid #c5d1e8', borderRadius: 8, minWidth: 180 },
+  input: { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, minWidth: 180, background: 'var(--surface)', color: 'var(--text)' },
   listBox: {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     maxHeight: 260,
     overflowY: 'auto',
-    border: '1px solid #e5ebf5',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: 8,
-    background: '#fbfdff',
+    background: 'var(--surface2)',
   },
   listItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    borderBottom: '1px solid #eef2f9',
+    borderBottom: '1px solid var(--border)',
     paddingBottom: 6,
   },
-  listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid #eef2f9', paddingBottom: 6 },
-  primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: '#0c6cff', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid #b5c3de', background: '#fff', color: '#1a3369', cursor: 'pointer', fontWeight: 700 },
-  smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: '#d6223b', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12 },
+  listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 6 },
+  primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontWeight: 800 },
+  secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 800 },
+  smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--danger)', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 },
 };
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    }
+    mql.addListener(onChange);
+    return () => mql.removeListener(onChange);
+  }, [query]);
+
+  return matches;
+}
