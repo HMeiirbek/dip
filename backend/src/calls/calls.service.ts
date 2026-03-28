@@ -19,7 +19,11 @@ export type CallQualitySampleInput = {
 @Injectable()
 export class CallsService {
   private readonly CALL_RING_TIMEOUT = 30000; // 30 seconds
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
+
+  private isExpired(call: { expiresAt?: Date | null }, now = new Date()) {
+    return Boolean(call.expiresAt && new Date(call.expiresAt).getTime() <= now.getTime());
+  }
 
   async create(callerId: string, calleeId: string) {
     if (!calleeId?.trim()) {
@@ -147,6 +151,19 @@ export class CallsService {
     if (call.calleeId !== userId) {
       throw new ForbiddenException('Only the callee can accept this call');
     }
+    if (this.isExpired(call)) {
+      await this.prisma.call.update({
+        where: { id },
+        data: {
+          status: 'rejected',
+          endedAt: new Date(),
+        },
+      });
+      throw new BadRequestException('Call has expired');
+    }
+    if (call.status === 'accepted') {
+      return call;
+    }
     if (call.status !== 'pending') {
       throw new BadRequestException(`Cannot accept a call with status: ${call.status}`);
     }
@@ -191,6 +208,19 @@ export class CallsService {
     if (call.callerId !== userId && call.calleeId !== userId) {
       throw new ForbiddenException('Not a participant of this call');
     }
+    if (call.status === 'active') {
+      return call;
+    }
+    if (this.isExpired(call)) {
+      await this.prisma.call.update({
+        where: { id },
+        data: {
+          status: 'ended',
+          endedAt: new Date(),
+        },
+      });
+      throw new BadRequestException('Cannot mark as active: call has expired');
+    }
     if (call.status !== 'accepted') {
       throw new BadRequestException(`Cannot mark as active: call status is ${call.status}`);
     }
@@ -225,6 +255,10 @@ export class CallsService {
       where: {
         calleeId: userId,
         status: 'pending',
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
       },
       include: {
         caller: { select: { id: true, username: true } },
@@ -235,11 +269,26 @@ export class CallsService {
   async getActiveCallForUser(userId: string) {
     return this.prisma.call.findFirst({
       where: {
-        OR: [
-          { callerId: userId },
-          { calleeId: userId },
+        AND: [
+          {
+            OR: [
+              { callerId: userId },
+              { calleeId: userId },
+            ],
+          },
+          {
+            OR: [
+              { status: 'active' },
+              {
+                status: 'accepted',
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } },
+                ],
+              },
+            ],
+          },
         ],
-        status: { in: ['accepted', 'active'] },
       },
       include: {
         caller: { select: { id: true, username: true } },
@@ -350,8 +399,30 @@ export class CallsService {
   async live(userId: string) {
     return this.prisma.call.findFirst({
       where: {
-        OR: [{ callerId: userId }, { calleeId: userId }],
-        status: { in: ['pending', 'accepted', 'active'] },
+        AND: [
+          {
+            OR: [{ callerId: userId }, { calleeId: userId }],
+          },
+          {
+            OR: [
+              { status: 'active' },
+              {
+                status: 'pending',
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } },
+                ],
+              },
+              {
+                status: 'accepted',
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } },
+                ],
+              },
+            ],
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       include: {

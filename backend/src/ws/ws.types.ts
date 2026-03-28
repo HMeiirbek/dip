@@ -2,14 +2,10 @@
  * WebSocket message types and interfaces for the DIP application
  */
 
-export interface RegisterUserPayload {
-  userId: string;
-}
-
 export interface IncomingCallPayload {
   callId: string;
-  calleeId: string;
-  callerName: string;
+  calleeId?: string;
+  callerName?: string;
 }
 
 export interface CallRejectedPayload {
@@ -44,7 +40,6 @@ export interface ICECandidatePayload {
  * Incoming WebSocket events (from client)
  */
 export interface WebSocketIncomingEvents {
-  'user:register': (data: RegisterUserPayload) => void;
   'call:incoming': (data: IncomingCallPayload) => void;
   'call:rejected': (data: CallRejectedPayload) => void;
   'call:accepted': (data: CallAcceptedPayload) => void;

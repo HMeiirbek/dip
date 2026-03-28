@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 
@@ -33,10 +33,15 @@ export class UsersService {
   }
 
   async updateMe(userId: string, data: { username?: string }) {
+    const normalizedUsername = data.username?.trim();
+    if (data.username !== undefined && !normalizedUsername) {
+      throw new BadRequestException('username cannot be empty');
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data: {
-        username: data.username,
+        username: normalizedUsername,
       },
       select: {
         id: true,

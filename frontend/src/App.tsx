@@ -67,6 +67,7 @@ export const App: React.FC = () => {
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const activeCallRef = useRef<Call | null>(null);
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
+  const incomingCallRef = useRef<Call | null>(null);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -92,6 +93,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
 
   const setMessage = (msg: string) => {
     setNotice(msg);
@@ -128,6 +133,22 @@ export const App: React.FC = () => {
       setupSocketListeners();
     } catch (e) {
       console.error('Failed to connect socket:', e);
+    }
+  };
+
+  const markCallActiveIfNeeded = async (callId: string) => {
+    try {
+      await apiService.markCallActive(callId);
+    } catch (e: unknown) {
+      const message = getAxiosErrorMessage(e);
+      if (
+        message.includes('call status is active') ||
+        message.includes('call status is ended') ||
+        message.includes('call has expired')
+      ) {
+        return;
+      }
+      throw e;
     }
   };
 
@@ -205,7 +226,17 @@ export const App: React.FC = () => {
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        if (pc.connectionState === 'connected') {
+          if (activeCallRef.current?.id) {
+            markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
+              console.error('Failed to mark call active:', e);
+            });
+          }
+          setCallStatus('active');
+          return;
+        }
+
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
           setCallStatus('ended');
           stopQualityReporter();
           endCall();
@@ -227,6 +258,21 @@ export const App: React.FC = () => {
       qualityTimerRef.current = null;
     }
     qualityBytesRef.current = null;
+  };
+
+  const resetRtcState = () => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    setLocalStream((prev) => {
+      prev?.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+    setRemoteStream(null);
+    pendingOfferRef.current = null;
+    pendingIceCandidatesRef.current = [];
   };
 
   const collectQualitySample = async (pc: RTCPeerConnection) => {
@@ -304,7 +350,7 @@ export const App: React.FC = () => {
       id: data.id,
       callerId: data.from,
       calleeId: data.to || currentUserRef.current?.id || '',
-      status: 'created',
+      status: 'pending',
       createdAt: new Date().toISOString(),
     };
     setIncomingCall(callObj);
@@ -315,7 +361,7 @@ export const App: React.FC = () => {
     if (!incomingCall || !currentUser) return;
 
     try {
-      setCallStatus('active');
+      setCallStatus('calling');
       const pc = await setupWebRTC(incomingCall, currentUser.id);
       if (!pc) {
         await apiService.rejectCall(incomingCall.id);
@@ -342,6 +388,8 @@ export const App: React.FC = () => {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
+      await apiService.acceptCall(incomingCall.id);
+
       socketService.sendAnswer({
         callId: incomingCall.id,
         from: currentUser.id,
@@ -349,20 +397,20 @@ export const App: React.FC = () => {
         answer: answer as RTCSessionDescriptionInit,
       });
 
-      await apiService.acceptCall(incomingCall.id);
-      await apiService.markCallActive(incomingCall.id);
-
       const callObj: Call = {
         id: incomingCall.id,
         callerId: incomingCall.callerId,
         calleeId: currentUser.id,
-        status: 'active',
+        status: 'accepted',
         createdAt: incomingCall.createdAt,
       };
       setActiveCall(callObj);
       setIncomingCall(null);
     } catch (e) {
       console.error('Error accepting call:', e);
+      stopQualityReporter();
+      resetRtcState();
+      setIncomingCall(null);
       setCallStatus('error');
     }
   };
@@ -469,21 +517,9 @@ export const App: React.FC = () => {
       await apiService.endCall(activeCall.id);
     } catch {}
 
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
-      setLocalStream(null);
-    }
-
-    setRemoteStream(null);
+    resetRtcState();
     setActiveCall(null);
     setRemoteUsername(null);
-    pendingOfferRef.current = null;
-    pendingIceCandidatesRef.current = [];
     setCallStatus('idle');
   };
 
@@ -524,7 +560,7 @@ export const App: React.FC = () => {
           }
         }
         if (activeCallRef.current) {
-          await apiService.markCallActive(activeCallRef.current.id);
+          await markCallActiveIfNeeded(activeCallRef.current.id);
         }
         setCallStatus('active');
       } catch (e) {
@@ -545,24 +581,16 @@ export const App: React.FC = () => {
     });
 
     socketService.onCallEnded(async (data: { callId: string; reason?: string }) => {
-      if (!activeCallRef.current || activeCallRef.current.id !== data.callId) {
+      const activeMatches = activeCallRef.current?.id === data.callId;
+      const incomingMatches = incomingCallRef.current?.id === data.callId;
+      if (!activeMatches && !incomingMatches) {
         return;
       }
       stopQualityReporter();
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      setLocalStream((prev) => {
-        prev?.getTracks().forEach((track) => track.stop());
-        return null;
-      });
-      setRemoteStream(null);
+      resetRtcState();
       setIncomingCall(null);
       setActiveCall(null);
       setRemoteUsername(null);
-      pendingOfferRef.current = null;
-      pendingIceCandidatesRef.current = [];
       setCallStatus('ended');
       setMessage(`Call ended: ${data.reason || 'remote end'}`);
       window.setTimeout(() => setCallStatus('idle'), 1200);
@@ -571,18 +599,13 @@ export const App: React.FC = () => {
 
   const handleLogin = async (token: string, username: string) => {
     try {
-      await connectSocketWithToken(token);
       const user = await apiService.getMe();
       setCurrentUser(user);
+      await connectSocketWithToken(token);
       setMessage(`Logged in as ${user.username}`);
     } catch (e) {
-      try {
-        const users = await apiService.getUsers();
-        const user = users.find((u) => u.username === username) || null;
-        setCurrentUser(user);
-      } catch {
-        setErrorMessage('Login completed but failed to fetch user profile');
-      }
+      console.error('Login follow-up failed for user:', username, e);
+      setErrorMessage('Login completed but failed to initialize the session');
     }
   };
 

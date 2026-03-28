@@ -180,6 +180,22 @@ export class AdminService {
     const rolesById = new Map(roles.map((row) => [row.user_id, row.role]));
     const sessionById = new Map(sessionRows.map((row) => [row.user_id, row]));
     const qualityByCallId = new Map(qualityRows.map((row) => [row.call_id, row]));
+    const trendRowsByCallId = new Map<
+      string,
+      Array<{
+        call_id: string;
+        created_at: Date;
+        rtt_ms: number | null;
+        jitter_ms: number | null;
+        packet_loss_pct: number | null;
+        mos_like: number | null;
+      }>
+    >();
+    for (const row of trendRows) {
+      const current = trendRowsByCallId.get(row.call_id) || [];
+      current.push(row);
+      trendRowsByCallId.set(row.call_id, current);
+    }
     const trendByCallId = new Map<
       string,
       {
@@ -190,7 +206,7 @@ export class AdminService {
       }
     >();
     for (const callId of callIds) {
-      const samples = trendRows.filter((row) => row.call_id === callId);
+      const samples = trendRowsByCallId.get(callId) || [];
       trendByCallId.set(callId, {
         rttMs: this.evaluateTrend(samples.map((s) => s.rtt_ms), true),
         jitterMs: this.evaluateTrend(samples.map((s) => s.jitter_ms), true),

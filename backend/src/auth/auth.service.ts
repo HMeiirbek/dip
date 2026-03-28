@@ -19,13 +19,14 @@ export class AuthService {
   ) {}
 
   async register(username: string, password: string) {
-    if (!username?.trim() || !password) {
-      throw new UnauthorizedException('Username and password required');
+    const normalizedUsername = username?.trim();
+    if (!normalizedUsername || !password) {
+      throw new BadRequestException('Username and password required');
     }
     const hash = await bcrypt.hash(password, 10);
     try {
       const user = await this.prisma.user.create({
-        data: { username: username.trim(), password: hash },
+        data: { username: normalizedUsername, password: hash },
       });
       const role = await this.security.resolveRole(user.id, user.username);
       return { id: user.id, username: user.username, role };
@@ -42,10 +43,11 @@ export class AuthService {
     password: string,
     meta?: { deviceInfo?: string; userAgent?: string; ipAddress?: string },
   ) {
-    if (!username || !password) {
-      throw new UnauthorizedException('Username and password required');
+    const normalizedUsername = username?.trim();
+    if (!normalizedUsername || !password) {
+      throw new BadRequestException('Username and password required');
     }
-    const user = await this.prisma.user.findUnique({ where: { username } });
+    const user = await this.prisma.user.findUnique({ where: { username: normalizedUsername } });
     if (!user) throw new UnauthorizedException();
 
     const ok = await bcrypt.compare(password, user.password);

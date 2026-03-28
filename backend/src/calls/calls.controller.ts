@@ -83,7 +83,14 @@ export class CallsController {
     @Req() req: { user: { sub: string } },
     @Param('id') id: string,
   ) {
-    return this.calls.reject(id, req.user.sub);
+    const call = await this.calls.reject(id, req.user.sub);
+    this.callEvents.emitRejected({
+      callId: call.id,
+      callerId: call.callerId,
+      calleeId: call.calleeId,
+      reason: 'rejected',
+    });
+    return call;
   }
 
   @ApiOperation({ summary: 'Mark Call Active' })
@@ -117,7 +124,15 @@ export class CallsController {
     @Req() req: { user: { sub: string } },
     @Param('id') id: string,
   ) {
-    return this.calls.end(id, req.user.sub);
+    const call = await this.calls.end(id, req.user.sub);
+    this.callEvents.emitEnded({
+      callId: call.id,
+      callerId: call.callerId,
+      calleeId: call.calleeId,
+      reason: 'ended-by-user',
+      endedBy: req.user.sub,
+    });
+    return call;
   }
 
   @ApiOperation({ summary: 'Get My Pending Call' })

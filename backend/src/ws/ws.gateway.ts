@@ -40,6 +40,33 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private logger = new Logger('WsGateway');
 
+  private emitCallEnded(callId: string, userIds: string[], reason: string, endedBy?: string | null) {
+    const payload = {
+      callId,
+      reason,
+      endedBy: endedBy || null,
+    };
+
+    for (const userId of userIds) {
+      const socketId = this.presence.getSocketIdByUserId(userId);
+      if (socketId) {
+        this.server.to(socketId).emit('call:ended', payload);
+      }
+    }
+  }
+
+  private rejectSocket(client: Socket, message: string) {
+    client.emit('error', { message });
+    client.disconnect();
+  }
+
+  private resolveCounterpartyUserId(
+    call: { callerId: string; calleeId: string },
+    senderId: string,
+  ) {
+    return call.callerId === senderId ? call.calleeId : call.callerId;
+  }
+
   private isSecureHandshake(client: Socket): boolean {
     const xfProto = `${client.handshake.headers['x-forwarded-proto'] || ''}`.toLowerCase();
     const referer = `${client.handshake.headers.referer || ''}`.toLowerCase();
@@ -71,19 +98,23 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     this.callEvents.onEnded((e) => {
-      const payload = {
-        callId: e.callId,
-        reason: e.reason || 'ended',
-        endedBy: e.endedBy || null,
-      };
+      this.emitCallEnded(
+        e.callId,
+        [e.callerId, e.calleeId],
+        e.reason || 'ended',
+        e.endedBy || null,
+      );
+    });
+
+    this.callEvents.onRejected((e) => {
       const callerSocketId = this.presence.getSocketIdByUserId(e.callerId);
       if (callerSocketId) {
-        this.server.to(callerSocketId).emit('call:ended', payload);
+        this.server.to(callerSocketId).emit('call:rejected', {
+          callId: e.callId,
+        });
       }
-      const calleeSocketId = this.presence.getSocketIdByUserId(e.calleeId);
-      if (calleeSocketId) {
-        this.server.to(calleeSocketId).emit('call:ended', payload);
-      }
+
+      this.emitCallEnded(e.callId, [e.callerId, e.calleeId], e.reason || 'rejected');
     });
   }
 
@@ -93,14 +124,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const enforceSecure = process.env.ENFORCE_SECURE_SIGNALING === 'true';
     if (enforceSecure && !this.isSecureHandshake(client)) {
       this.logger.warn(`Rejected insecure socket connection: ${client.id}`);
-      client.emit('error', { message: 'Secure signaling required (HTTPS/WSS)' });
-      client.disconnect();
+      this.rejectSocket(client, 'Secure signaling required (HTTPS/WSS)');
       return;
     }
 
     const token = (client.handshake.auth && client.handshake.auth.token) || client.handshake.query?.token;
     if (!token) {
       this.logger.warn(`Socket ${client.id} connected without token`);
+      this.rejectSocket(client, 'Authentication token required');
       return;
     }
 
@@ -108,8 +139,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = this.jwtService.verify(token as string);
       const userId = (payload as any).sub || (payload as any).userId || (payload as any).id;
       if (!userId) {
-        client.emit('error', { message: 'Invalid token payload' });
-        client.disconnect();
+        this.rejectSocket(client, 'Invalid token payload');
         return;
       }
 
@@ -118,8 +148,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.broadcastOnlineUsers();
     } catch (err) {
       this.logger.warn(`JWT verification failed for socket ${client.id}: ${err?.message || err}`);
-      client.emit('error', { message: 'Invalid token' });
-      client.disconnect();
+      this.rejectSocket(client, 'Invalid token');
     }
   }
 
@@ -132,29 +161,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('user:register')
-  handleRegisterUser(
-    @MessageBody() data: { userId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    if (!data?.userId) {
-      client.emit('error', { message: 'userId required' });
-      return;
-    }
-
-    this.presence.setOnline(data.userId, client.id);
-    this.logger.log(`User registered: ${data.userId} (socket: ${client.id})`);
-
-    this.broadcastOnlineUsers();
-  }
-
   @SubscribeMessage('call:incoming')
   async handleIncomingCall(
     @MessageBody() data: { callId: string; calleeId: string; callerName?: string },
     @ConnectedSocket() client: Socket,
   ) {
-    if (!data?.callId || !data?.calleeId) {
-      client.emit('error', { message: 'callId and calleeId required' });
+    if (!data?.callId) {
+      client.emit('error', { message: 'callId required' });
       return;
     }
     // validate that the sender is participant of this call
@@ -163,21 +176,23 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const calleeSocketId = this.presence.getSocketIdByUserId(data.calleeId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const calleeSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!calleeSocketId) {
       // let the client know callee is offline; server-side create flow will still emit when callee reconnects
       client.emit('error', { message: 'Callee is not online' });
       return;
     }
 
-    this.logger.log(`Incoming call: ${data.callId} to ${data.calleeId}`);
+    this.logger.log(`Incoming call: ${data.callId} to ${targetUserId}`);
     this.server.to(calleeSocketId).emit('call:incoming', {
       callId: data.callId,
       callerId: senderId,
@@ -195,14 +210,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const callerSocketId = this.presence.getSocketIdByUserId(data.callerId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (callerSocketId) {
       this.logger.log(`Call rejected: ${data.callId}`);
       this.server.to(callerSocketId).emit('call:rejected', {
@@ -221,14 +238,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const callerSocketId = this.presence.getSocketIdByUserId(data.callerId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (callerSocketId) {
       this.logger.log(`Call accepted: ${data.callId}`);
       this.server.to(callerSocketId).emit('call:accepted', {
@@ -252,20 +271,22 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetSocketId = this.presence.getSocketIdByUserId(data.targetUserId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       client.emit('error', { message: 'Target user is not online' });
       return;
     }
 
-    this.logger.debug(`WebRTC offer: ${data.callId} from ${senderId} to ${data.targetUserId}`);
+    this.logger.debug(`WebRTC offer: ${data.callId} from ${senderId} to ${targetUserId}`);
 
     this.server.to(targetSocketId).emit('webrtc:offer', {
       callId: data.callId,
@@ -289,20 +310,22 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetSocketId = this.presence.getSocketIdByUserId(data.targetUserId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       client.emit('error', { message: 'Target user is not online' });
       return;
     }
 
-    this.logger.debug(`WebRTC answer: ${data.callId} from ${senderId} to ${data.targetUserId}`);
+    this.logger.debug(`WebRTC answer: ${data.callId} from ${senderId} to ${targetUserId}`);
 
     this.server.to(targetSocketId).emit('webrtc:answer', {
       callId: data.callId,
@@ -326,14 +349,16 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
+    let call;
     try {
-      await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetSocketId = this.presence.getSocketIdByUserId(data.targetUserId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       // Silently ignore if target is offline
       return;

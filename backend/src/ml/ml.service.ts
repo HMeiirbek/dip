@@ -1,25 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class MlService implements OnModuleInit {
+export class MlService {
   constructor(private prisma: PrismaService) {}
 
-  async onModuleInit() {
-    await this.prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS ml_models_runtime (
-        id TEXT PRIMARY KEY,
-        version TEXT NOT NULL,
-        accuracy DOUBLE PRECISION NOT NULL,
-        precision DOUBLE PRECISION NOT NULL,
-        recall DOUBLE PRECISION NOT NULL,
-        f1 DOUBLE PRECISION NOT NULL,
-        is_active BOOLEAN NOT NULL DEFAULT FALSE,
-        loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
+  private async ensureSeedModel() {
     const rows = await this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
       `SELECT COUNT(*)::text AS count FROM ml_models_runtime`,
     );
@@ -35,6 +22,7 @@ export class MlService implements OnModuleInit {
   }
 
   async status() {
+    await this.ensureSeedModel();
     const active = await this.activeModel();
     const total = await this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
       `SELECT COUNT(*)::text AS count FROM ml_models_runtime`,
@@ -48,6 +36,7 @@ export class MlService implements OnModuleInit {
   }
 
   async metrics() {
+    await this.ensureSeedModel();
     const active = (await this.activeModel()) || (await this.latestModel());
     if (!active) {
       return {
@@ -73,6 +62,7 @@ export class MlService implements OnModuleInit {
   }
 
   async history() {
+    await this.ensureSeedModel();
     const rows = await this.prisma.$queryRawUnsafe<
       Array<{
         id: string;
@@ -104,6 +94,7 @@ export class MlService implements OnModuleInit {
   }
 
   async reload(version?: string) {
+    await this.ensureSeedModel();
     await this.prisma.$executeRawUnsafe(`UPDATE ml_models_runtime SET is_active = FALSE WHERE is_active = TRUE`);
 
     const id = crypto.randomUUID();

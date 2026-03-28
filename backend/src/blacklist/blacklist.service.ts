@@ -1,22 +1,10 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class BlacklistService implements OnModuleInit {
+export class BlacklistService {
   constructor(private prisma: PrismaService) {}
-
-  async onModuleInit() {
-    await this.prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS risk_blacklist (
-        id TEXT PRIMARY KEY,
-        phone_number TEXT NOT NULL UNIQUE,
-        reason TEXT NULL,
-        source TEXT NOT NULL DEFAULT 'user',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-  }
 
   async list() {
     const rows = await this.prisma.$queryRawUnsafe<

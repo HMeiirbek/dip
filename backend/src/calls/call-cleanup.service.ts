@@ -6,6 +6,7 @@ import { CallEventsService } from './call-events.service';
 export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
   private logger = new Logger('CallCleanupService');
   private interval?: NodeJS.Timeout;
+  private isRunning = false;
   private readonly CHECK_INTERVAL = 5000; // every 5 seconds
 
   constructor(private prisma: PrismaService, private callEvents: CallEventsService) {}
@@ -20,6 +21,11 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async cleanupExpired() {
+    if (this.isRunning) {
+      return;
+    }
+
+    this.isRunning = true;
     try {
       const now = new Date();
       const expiredPending = await this.prisma.call.findMany({
@@ -39,9 +45,14 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Auto-rejected expired call ${c.id}`);
         // notify interested parties via events
         try {
-          this.callEvents.emitRejected({ callId: c.id, callerId: c.callerId, calleeId: c.calleeId });
+          this.callEvents.emitRejected({
+            callId: c.id,
+            callerId: c.callerId,
+            calleeId: c.calleeId,
+            reason: 'ring-timeout',
+          });
         } catch (e) {
-          this.logger.debug('Failed to emit rejected event: ' + e?.message);
+          this.logger.debug(`Failed to emit rejected event: ${e?.message || e}`);
         }
       }
 
@@ -51,9 +62,17 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
           data: { status: 'ended', endedAt: new Date() },
         });
         this.logger.log(`Auto-ended stale accepted call ${c.id}`);
+        this.callEvents.emitEnded({
+          callId: c.id,
+          callerId: c.callerId,
+          calleeId: c.calleeId,
+          reason: 'accepted-session-timeout',
+        });
       }
     } catch (err) {
-      this.logger.error('Error cleaning up expired calls: ' + err?.message || err);
+      this.logger.error(`Error cleaning up expired calls: ${err?.message || err}`);
+    } finally {
+      this.isRunning = false;
     }
   }
 }

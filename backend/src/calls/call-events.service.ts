@@ -16,6 +16,13 @@ export interface CallEndedEvent {
   endedBy?: string;
 }
 
+export interface CallRejectedEvent {
+  callId: string;
+  callerId: string;
+  calleeId: string;
+  reason?: string;
+}
+
 @Injectable()
 export class CallEventsService {
   private ee = new EventEmitter();
@@ -28,11 +35,11 @@ export class CallEventsService {
     this.ee.on('incoming', cb);
   }
 
-  emitRejected(event: { callId: string; callerId: string; calleeId: string }) {
+  emitRejected(event: CallRejectedEvent) {
     this.ee.emit('rejected', event);
   }
 
-  onRejected(cb: (e: { callId: string; callerId: string; calleeId: string }) => void) {
+  onRejected(cb: (e: CallRejectedEvent) => void) {
     this.ee.on('rejected', cb);
   }
 
