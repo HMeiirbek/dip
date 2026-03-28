@@ -13,41 +13,105 @@ export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
   @ApiOperation({ summary: 'Admin Dashboard' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('dashboard')
   async dashboard() {
     return this.admin.dashboard();
   }
 
   @ApiOperation({ summary: 'Admin Users' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('users')
   async users() {
     return this.admin.users();
+  }
+
+  @ApiOperation({ summary: 'Admin User Detail' })
+  @Roles('admin')
+  @Get('users/:id/detail')
+  async userDetail(@Param('id') id: string) {
+    return this.admin.userDetail(id);
   }
 
   @ApiOperation({ summary: 'Update User Role' })
   @Roles('admin')
   @Put('users/:id/role')
   async updateUserRole(
+    @Req() req: { user: { sub: string } },
     @Param('id') id: string,
     @Body('role') role: string,
   ) {
-    return this.admin.updateUserRole(id, role);
+    return this.admin.updateUserRole(id, role, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Reset User Password (Admin)' })
+  @Roles('admin')
+  @Post('users/:id/reset-password')
+  async resetUserPassword(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    return this.admin.resetUserPassword(id, newPassword, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Revoke All Sessions For User (Admin)' })
+  @Roles('admin')
+  @Post('users/:id/revoke-sessions')
+  async revokeUserSessions(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.admin.revokeUserSessions(id, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Revoke Specific Session For User (Admin)' })
+  @Roles('admin')
+  @Post('users/:id/sessions/:sessionId/revoke')
+  async revokeUserSession(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.admin.revokeUserSession(id, sessionId, req.user.sub);
   }
 
   @ApiOperation({ summary: 'Delete User' })
   @Roles('admin')
   @Delete('users/:id')
-  async deleteUser(@Param('id') id: string) {
-    return this.admin.deleteUser(id);
+  async deleteUser(
+    @Req() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.admin.deleteUser(id, req.user.sub);
   }
 
   @ApiOperation({ summary: 'Admin Calls' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('calls')
   async calls() {
     return this.admin.calls();
+  }
+
+  @ApiOperation({ summary: 'All Sessions (Admin)' })
+  @Roles('admin')
+  @Get('sessions')
+  async sessions(@Query('limit') limit?: string) {
+    return this.admin.sessions(Number(limit || 300));
+  }
+
+  @ApiOperation({ summary: 'All Security Activity (Admin)' })
+  @Roles('admin')
+  @Get('security-activity')
+  async securityActivity(@Query('limit') limit?: string) {
+    return this.admin.securityActivity(Number(limit || 400));
+  }
+
+  @ApiOperation({ summary: 'Traffic Logs / Quality Samples (Admin)' })
+  @Roles('admin')
+  @Get('traffic-logs')
+  async trafficLogs(@Query('limit') limit?: string) {
+    return this.admin.trafficLogs(Number(limit || 400));
   }
 
   @ApiOperation({ summary: 'Moderator Live Overview' })
@@ -130,21 +194,21 @@ export class AdminController {
   }
 
   @ApiOperation({ summary: 'Admin Reports' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('reports')
   async reports() {
     return this.admin.reports();
   }
 
   @ApiOperation({ summary: 'Admin Analytics' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('analytics')
   async analytics() {
     return this.admin.analytics();
   }
 
   @ApiOperation({ summary: 'SLA / Acceptance Summary (Admin/Moderator)' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('sla-summary')
   async slaSummary() {
     return this.admin.slaSummary();
@@ -158,7 +222,7 @@ export class AdminController {
   }
 
   @ApiOperation({ summary: 'Admin Blacklist' })
-  @Roles('admin', 'moderator')
+  @Roles('admin')
   @Get('blacklist')
   async blacklist() {
     return this.admin.blacklist();

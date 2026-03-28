@@ -1,13 +1,18 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import {
+  AdminManagedSession,
   User,
   AuthResponse,
   RegisterResponse,
   Call,
   CallQualitySample,
   AdminCallQualityHistory,
+  AdminUser,
+  AdminSecurityEvent,
   ModeratorCallFlagsPage,
   AdminSlaSummary,
+  AdminTrafficLog,
+  AdminUserDetail,
 } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
@@ -265,13 +270,47 @@ class ApiService {
     return response.data;
   }
 
-  async getAdminUsers(): Promise<any[]> {
-    const response = await this.api.get<any[]>('/admin/users');
+  async getAdminUsers(): Promise<AdminUser[]> {
+    const response = await this.api.get<AdminUser[]>('/admin/users');
+    return response.data;
+  }
+
+  async getAdminUserDetail(id: string): Promise<AdminUserDetail> {
+    const response = await this.api.get<AdminUserDetail>(`/admin/users/${id}/detail`);
     return response.data;
   }
 
   async updateUserRole(id: string, role: 'user' | 'admin' | 'moderator'): Promise<any> {
     const response = await this.api.put(`/admin/users/${id}/role`, { role });
+    return response.data;
+  }
+
+  async resetAdminUserPassword(id: string, newPassword: string): Promise<{ success: boolean; userId: string; revoked: number }> {
+    const response = await this.api.post<{ success: boolean; userId: string; revoked: number }>(
+      `/admin/users/${id}/reset-password`,
+      { newPassword },
+    );
+    return response.data;
+  }
+
+  async revokeAdminUserSessions(id: string): Promise<{ success: boolean; userId: string; revoked: number }> {
+    const response = await this.api.post<{ success: boolean; userId: string; revoked: number }>(
+      `/admin/users/${id}/revoke-sessions`,
+      {},
+    );
+    return response.data;
+  }
+
+  async revokeAdminUserSession(id: string, sessionId: string): Promise<{ success: boolean; userId: string; sessionId: string; revoked: number }> {
+    const response = await this.api.post<{ success: boolean; userId: string; sessionId: string; revoked: number }>(
+      `/admin/users/${id}/sessions/${sessionId}/revoke`,
+      {},
+    );
+    return response.data;
+  }
+
+  async deleteAdminUser(id: string): Promise<{ success: boolean }> {
+    const response = await this.api.delete<{ success: boolean }>(`/admin/users/${id}`);
     return response.data;
   }
 
@@ -360,6 +399,27 @@ class ApiService {
 
   async getAdminBlacklist(): Promise<any[]> {
     const response = await this.api.get<any[]>('/admin/blacklist');
+    return response.data;
+  }
+
+  async getAdminSessions(limit = 300): Promise<AdminManagedSession[]> {
+    const response = await this.api.get<AdminManagedSession[]>('/admin/sessions', {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async getAdminSecurityActivity(limit = 400): Promise<AdminSecurityEvent[]> {
+    const response = await this.api.get<AdminSecurityEvent[]>('/admin/security-activity', {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async getAdminTrafficLogs(limit = 400): Promise<AdminTrafficLog[]> {
+    const response = await this.api.get<AdminTrafficLog[]>('/admin/traffic-logs', {
+      params: { limit },
+    });
     return response.data;
   }
 

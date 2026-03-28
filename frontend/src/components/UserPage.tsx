@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { User } from '../types';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'admin';
+type TabKey = 'calls' | 'security' | 'risk' | 'moderator' | 'admin';
 
 export const UserDrawer: React.FC<{
   open: boolean;
@@ -82,8 +82,16 @@ export const UserDrawer: React.FC<{
             <button
               style={(roleLabel === 'admin' || roleLabel === 'moderator') ? styles.secondaryButton : styles.secondaryButtonDisabled}
               disabled={roleLabel !== 'admin' && roleLabel !== 'moderator'}
+              onClick={() => onNavigate('moderator')}
+              title={roleLabel === 'admin' || roleLabel === 'moderator' ? 'Open moderator tools' : 'No access'}
+            >
+              Moderator
+            </button>
+            <button
+              style={roleLabel === 'admin' ? styles.secondaryButton : styles.secondaryButtonDisabled}
+              disabled={roleLabel !== 'admin'}
               onClick={() => onNavigate('admin')}
-              title={roleLabel === 'admin' || roleLabel === 'moderator' ? 'Open admin' : 'No access'}
+              title={roleLabel === 'admin' ? 'Open admin tools' : 'No access'}
             >
               Admin
             </button>
@@ -307,4 +315,3 @@ const styles: Record<string, any> = {
     fontWeight: 900,
   } as React.CSSProperties,
 };
-

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppRole, SecurityService } from '../auth/security.service';
 import { AuthService } from '../auth/auth.service';
@@ -47,27 +48,366 @@ export class AdminService {
   }
 
   async users() {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         username: true,
         createdAt: true,
       },
-      take: 300,
+      take: 500,
+    });
+
+    const userIds = users.map((user) => user.id);
+    if (!userIds.length) return [];
+
+    const [roleRows, sessionRows, callRows, reportRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Array<{ user_id: string; role: string; is_verified: boolean }>>(
+        `SELECT user_id, role, is_verified
+         FROM security_user_state
+         WHERE user_id = ANY($1::text[])`,
+        userIds,
+      ),
+      this.prisma.$queryRawUnsafe<
+        Array<{
+          user_id: string;
+          total_count: string;
+          active_count: string;
+          last_seen_at: Date | null;
+        }>
+      >(
+        `SELECT
+          user_id,
+          COUNT(*)::text AS total_count,
+          SUM(CASE WHEN revoked_at IS NULL AND expires_at > NOW() THEN 1 ELSE 0 END)::text AS active_count,
+          MAX(last_seen_at) AS last_seen_at
+         FROM security_sessions
+         WHERE user_id = ANY($1::text[])
+         GROUP BY user_id`,
+        userIds,
+      ),
+      this.prisma.$queryRawUnsafe<Array<{ user_id: string; call_count: string }>>(
+        `SELECT participant.user_id, COUNT(*)::text AS call_count
+         FROM (
+           SELECT "callerId" AS user_id FROM "Call" WHERE "callerId" = ANY($1::text[])
+           UNION ALL
+           SELECT "calleeId" AS user_id FROM "Call" WHERE "calleeId" = ANY($1::text[])
+         ) participant
+         GROUP BY participant.user_id`,
+        userIds,
+      ),
+      this.prisma.$queryRawUnsafe<Array<{ user_id: string; report_count: string }>>(
+        `SELECT user_id, COUNT(*)::text AS report_count
+         FROM risk_reports
+         WHERE user_id = ANY($1::text[])
+         GROUP BY user_id`,
+        userIds,
+      ),
+    ]);
+
+    const rolesById = new Map(roleRows.map((row) => [row.user_id, row]));
+    const sessionsById = new Map(sessionRows.map((row) => [row.user_id, row]));
+    const callsById = new Map(callRows.map((row) => [row.user_id, row]));
+    const reportsById = new Map(reportRows.map((row) => [row.user_id, row]));
+    const onlineIds = new Set(this.presence.getOnlineUserIds());
+
+    return users.map((user) => {
+      const roleRow = rolesById.get(user.id);
+      const sessionRow = sessionsById.get(user.id);
+      const callRow = callsById.get(user.id);
+      const reportRow = reportsById.get(user.id);
+      return {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        role: roleRow?.role || 'user',
+        verified: Boolean(roleRow?.is_verified),
+        activeSessions: Number(sessionRow?.active_count || 0),
+        totalSessions: Number(sessionRow?.total_count || 0),
+        totalCalls: Number(callRow?.call_count || 0),
+        reportsSubmitted: Number(reportRow?.report_count || 0),
+        lastSeenAt: sessionRow?.last_seen_at || null,
+        online: onlineIds.has(user.id),
+      };
     });
   }
 
-  async updateUserRole(id: string, role: string) {
+  async userDetail(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        createdAt: true,
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const [roleRows, sessionRows, activityRows, calls, reportRows, stats, flagRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Array<{ role: string; is_verified: boolean }>>(
+        `SELECT role, is_verified
+         FROM security_user_state
+         WHERE user_id = $1
+         LIMIT 1`,
+        id,
+      ),
+      this.prisma.$queryRawUnsafe<
+        Array<{
+          id: string;
+          role: string;
+          device_info: string | null;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: Date;
+          last_seen_at: Date;
+          expires_at: Date;
+          revoked_at: Date | null;
+        }>
+      >(
+        `SELECT id, role, device_info, ip_address, user_agent, created_at, last_seen_at, expires_at, revoked_at
+         FROM security_sessions
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 200`,
+        id,
+      ),
+      this.prisma.$queryRawUnsafe<
+        Array<{
+          action: string;
+          created_at: Date;
+          ip_address: string | null;
+          device: string | null;
+        }>
+      >(
+        `SELECT action, created_at, ip_address, device
+         FROM security_logs
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 300`,
+        id,
+      ),
+      this.prisma.call.findMany({
+        where: {
+          OR: [
+            { callerId: id },
+            { calleeId: id },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 120,
+        include: {
+          caller: { select: { id: true, username: true } },
+          callee: { select: { id: true, username: true } },
+        },
+      }),
+      this.prisma.$queryRawUnsafe<
+        Array<{
+          id: string;
+          phone_number: string;
+          description: string | null;
+          status: string;
+          created_at: Date;
+        }>
+      >(
+        `SELECT id, phone_number, description, status, created_at
+         FROM risk_reports
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 200`,
+        id,
+      ),
+      Promise.all([
+        this.prisma.call.count({
+          where: {
+            OR: [
+              { callerId: id },
+              { calleeId: id },
+            ],
+          },
+        }),
+        this.prisma.call.count({ where: { callerId: id } }),
+        this.prisma.call.count({ where: { calleeId: id } }),
+        this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
+          `SELECT COUNT(*)::text AS count
+           FROM risk_reports
+           WHERE user_id = $1`,
+          id,
+        ),
+      ]),
+      this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
+        `SELECT COUNT(*)::text AS count
+         FROM moderation_call_flags f
+         JOIN "Call" c ON c.id = f.call_id
+         WHERE f.status = 'open'
+           AND (c."callerId" = $1 OR c."calleeId" = $1)`,
+        id,
+      ),
+    ]);
+
+    const [totalCalls, initiatedCalls, receivedCalls, reportsCountRows] = stats;
+    const presenceEntries = this.presence
+      .getPresenceSnapshot()
+      .filter((entry) => entry.userId === id);
+    const roleRow = roleRows[0];
+    const mappedSessions = sessionRows.map((row) => ({
+      id: row.id,
+      role: row.role,
+      deviceInfo: row.device_info || 'unknown',
+      ipAddress: row.ip_address || 'unknown',
+      userAgent: row.user_agent || 'unknown',
+      createdAt: row.created_at,
+      lastSeenAt: row.last_seen_at,
+      expiresAt: row.expires_at,
+      revokedAt: row.revoked_at,
+      active: !row.revoked_at && new Date(row.expires_at).getTime() > Date.now(),
+    }));
+
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        role: roleRow?.role || 'user',
+        verified: Boolean(roleRow?.is_verified),
+        online: presenceEntries.length > 0,
+      },
+      presence: presenceEntries,
+      stats: {
+        totalCalls,
+        initiatedCalls,
+        receivedCalls,
+        reportsSubmitted: Number(reportsCountRows?.[0]?.count || 0),
+        activeSessions: mappedSessions.filter((session) => session.active).length,
+        openFlags: Number(flagRows?.[0]?.count || 0),
+      },
+      sessions: mappedSessions,
+      securityActivity: activityRows.map((row) => ({
+        action: row.action,
+        createdAt: row.created_at,
+        ipAddress: row.ip_address || undefined,
+        deviceInfo: row.device || undefined,
+      })),
+      callHistory: calls.map((call) => {
+        const counterpart =
+          call.callerId === id
+            ? { id: call.calleeId, username: call.callee?.username || call.calleeId }
+            : { id: call.callerId, username: call.caller?.username || call.callerId };
+        const baseline = call.startedAt || call.createdAt;
+        const end = call.endedAt || new Date();
+        const durationSec =
+          baseline && end
+            ? Math.max(0, Math.floor((new Date(end).getTime() - new Date(baseline).getTime()) / 1000))
+            : 0;
+
+        return {
+          id: call.id,
+          status: call.status,
+          createdAt: call.createdAt,
+          startedAt: call.startedAt,
+          endedAt: call.endedAt,
+          durationSec,
+          direction: call.callerId === id ? 'outgoing' : 'incoming',
+          counterpart,
+        };
+      }),
+      reports: reportRows.map((row) => ({
+        id: row.id,
+        userId: id,
+        phoneNumber: row.phone_number,
+        description: row.description ?? undefined,
+        status: row.status,
+        createdAt: row.created_at,
+      })),
+    };
+  }
+
+  async updateUserRole(id: string, role: string, actorId?: string) {
     const normalized = role as AppRole;
     if (!['user', 'admin', 'moderator'].includes(normalized)) {
       return { success: false, message: 'Role must be user/admin/moderator' };
     }
-    return this.auth.setRole(id, normalized);
+    const result = await this.auth.setRole(id, normalized);
+    if (actorId) {
+      await this.securityService.logActivity(actorId, {
+        action: `admin_set_role target=${id} role=${normalized}`,
+        at: new Date(),
+      });
+    }
+    return result;
   }
 
-  async deleteUser(id: string) {
+  async resetUserPassword(id: string, newPassword: string, actorId: string) {
+    const normalized = newPassword?.trim();
+    if (!normalized || normalized.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, username: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const hash = await bcrypt.hash(normalized, 10);
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hash },
+    });
+    const revoked = await this.securityService.revokeAll(id);
+    const now = new Date();
+    await this.securityService.logActivity(actorId, {
+      action: `admin_reset_password target=${id}`,
+      at: now,
+    });
+    await this.securityService.logActivity(id, {
+      action: `password_reset_by_admin actor=${actorId}`,
+      at: now,
+    });
+
+    return { success: true, userId: id, revoked };
+  }
+
+  async revokeUserSessions(id: string, actorId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const revoked = await this.securityService.revokeAll(id);
+    await this.securityService.logActivity(actorId, {
+      action: `admin_revoke_all_sessions target=${id} revoked=${revoked}`,
+      at: new Date(),
+    });
+    return { success: true, userId: id, revoked };
+  }
+
+  async revokeUserSession(id: string, sessionId: string, actorId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const revoked = await this.securityService.revokeBySessionId(id, sessionId);
+    await this.securityService.logActivity(actorId, {
+      action: `admin_revoke_session target=${id} session=${sessionId} revoked=${revoked}`,
+      at: new Date(),
+    });
+    return { success: true, userId: id, sessionId, revoked };
+  }
+
+  async deleteUser(id: string, actorId?: string) {
+    if (actorId && actorId === id) {
+      throw new BadRequestException('Cannot delete your own account from admin panel');
+    }
     await this.prisma.user.delete({ where: { id } });
+    if (actorId) {
+      await this.securityService.logActivity(actorId, {
+        action: `admin_delete_user target=${id}`,
+        at: new Date(),
+      });
+    }
     return { success: true };
   }
 
@@ -80,6 +420,154 @@ export class AdminService {
         callee: { select: { id: true, username: true } },
       },
     });
+  }
+
+  async sessions(limit = 300) {
+    const safeLimit = Math.max(20, Math.min(1000, Number(limit) || 300));
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        id: string;
+        user_id: string;
+        username: string | null;
+        role: string;
+        device_info: string | null;
+        ip_address: string | null;
+        user_agent: string | null;
+        created_at: Date;
+        last_seen_at: Date;
+        expires_at: Date;
+        revoked_at: Date | null;
+      }>
+    >(
+      `SELECT
+        s.id,
+        s.user_id,
+        u.username,
+        s.role,
+        s.device_info,
+        s.ip_address,
+        s.user_agent,
+        s.created_at,
+        s.last_seen_at,
+        s.expires_at,
+        s.revoked_at
+       FROM security_sessions s
+       LEFT JOIN "User" u ON u.id = s.user_id
+       ORDER BY s.last_seen_at DESC
+       LIMIT $1`,
+      safeLimit,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      username: row.username || 'unknown',
+      role: row.role,
+      deviceInfo: row.device_info || 'unknown',
+      ipAddress: row.ip_address || 'unknown',
+      userAgent: row.user_agent || 'unknown',
+      createdAt: row.created_at,
+      lastSeenAt: row.last_seen_at,
+      expiresAt: row.expires_at,
+      revokedAt: row.revoked_at,
+      active: !row.revoked_at && new Date(row.expires_at).getTime() > Date.now(),
+    }));
+  }
+
+  async securityActivity(limit = 400) {
+    const safeLimit = Math.max(20, Math.min(2000, Number(limit) || 400));
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        user_id: string;
+        username: string | null;
+        action: string;
+        created_at: Date;
+        ip_address: string | null;
+        device: string | null;
+      }>
+    >(
+      `SELECT
+        l.user_id,
+        u.username,
+        l.action,
+        l.created_at,
+        l.ip_address,
+        l.device
+       FROM security_logs l
+       LEFT JOIN "User" u ON u.id = l.user_id
+       ORDER BY l.created_at DESC
+       LIMIT $1`,
+      safeLimit,
+    );
+
+    return rows.map((row) => ({
+      userId: row.user_id,
+      username: row.username || 'unknown',
+      action: row.action,
+      createdAt: row.created_at,
+      ipAddress: row.ip_address || undefined,
+      deviceInfo: row.device || undefined,
+    }));
+  }
+
+  async trafficLogs(limit = 400) {
+    const safeLimit = Math.max(20, Math.min(2000, Number(limit) || 400));
+    const rows = await this.prisma.$queryRawUnsafe<
+      Array<{
+        id: string;
+        call_id: string;
+        user_id: string;
+        username: string | null;
+        rtt_ms: number | null;
+        jitter_ms: number | null;
+        packet_loss_pct: number | null;
+        mos_like: number | null;
+        bitrate_kbps: number | null;
+        created_at: Date;
+        call_status: string | null;
+        caller_username: string | null;
+        callee_username: string | null;
+      }>
+    >(
+      `SELECT
+        q.id,
+        q.call_id,
+        q.user_id,
+        u.username,
+        q.rtt_ms,
+        q.jitter_ms,
+        q.packet_loss_pct,
+        q.mos_like,
+        q.bitrate_kbps,
+        q.created_at,
+        c.status AS call_status,
+        caller.username AS caller_username,
+        callee.username AS callee_username
+       FROM call_quality_metrics q
+       LEFT JOIN "User" u ON u.id = q.user_id
+       LEFT JOIN "Call" c ON c.id = q.call_id
+       LEFT JOIN "User" caller ON caller.id = c."callerId"
+       LEFT JOIN "User" callee ON callee.id = c."calleeId"
+       ORDER BY q.created_at DESC
+       LIMIT $1`,
+      safeLimit,
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      callId: row.call_id,
+      userId: row.user_id,
+      username: row.username || 'unknown',
+      createdAt: row.created_at,
+      rttMs: row.rtt_ms,
+      jitterMs: row.jitter_ms,
+      packetLossPct: row.packet_loss_pct,
+      mosLike: row.mos_like,
+      bitrateKbps: row.bitrate_kbps,
+      callStatus: row.call_status || 'unknown',
+      callerUsername: row.caller_username || 'unknown',
+      calleeUsername: row.callee_username || 'unknown',
+    }));
   }
 
   async moderationOverview() {

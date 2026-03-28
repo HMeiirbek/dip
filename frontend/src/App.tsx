@@ -5,7 +5,8 @@ import { LoginForm } from './components/LoginForm';
 import { CallsPanel } from './components/CallsPanel';
 import { SecurityPanel } from './components/SecurityPanel';
 import { RiskPanel } from './components/RiskPanel';
-import { AdminPanel } from './components/AdminPanel';
+import { AdminPage } from './components/AdminPage';
+import { ModeratorPage } from './components/ModeratorPage';
 import { UserDrawer } from './components/UserPage';
 import { useControlCenterData } from './hooks/useControlCenterData';
 import {
@@ -17,7 +18,7 @@ import {
   RTCICECandidateData,
 } from './types';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'admin';
+type TabKey = 'calls' | 'security' | 'risk' | 'moderator' | 'admin';
 type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
@@ -90,10 +91,11 @@ export const App: React.FC = () => {
   const [notice, setNotice] = useState<string>('');
   const [error, setError] = useState<string>('');
 
-  const isAdminLike = useMemo(
+  const isModeratorLike = useMemo(
     () => currentUser?.role === 'admin' || currentUser?.role === 'moderator',
     [currentUser],
   );
+  const isAdmin = useMemo(() => currentUser?.role === 'admin', [currentUser]);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -124,12 +126,13 @@ export const App: React.FC = () => {
 
   const controlCenter = useControlCenterData({
     currentUser,
-    isAdminLike,
+    isAdmin,
+    isModeratorLike,
     setCurrentUser,
     notify: setMessage,
     notifyError: setErrorMessage,
   });
-  const { security, risk, admin } = controlCenter;
+  const { security, risk, admin, moderator } = controlCenter;
 
   const getUserDetails = async (userId: string): Promise<User | null> => {
     try {
@@ -198,20 +201,42 @@ export const App: React.FC = () => {
     if (activeTab === 'risk') {
       risk.loadRiskData();
     }
+    if (activeTab === 'moderator') {
+      moderator.loadModeratorData();
+    }
     if (activeTab === 'admin') {
       admin.loadAdminData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, currentUser, isAdminLike]);
+  }, [activeTab, currentUser, isAdmin, isModeratorLike]);
 
   useEffect(() => {
-    if (!currentUser || !isAdminLike || activeTab !== 'admin') return;
+    if (!currentUser || !isModeratorLike || activeTab !== 'moderator') return;
     const id = window.setInterval(() => {
-      admin.loadAdminData();
+      moderator.loadModeratorData();
     }, 5000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, currentUser?.id, isAdminLike]);
+  }, [activeTab, currentUser?.id, isModeratorLike]);
+
+  useEffect(() => {
+    if (!currentUser || !isAdmin || activeTab !== 'admin') return;
+    const id = window.setInterval(() => {
+      admin.loadAdminData();
+    }, 15000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser?.id, isAdmin]);
+
+  useEffect(() => {
+    if (activeTab === 'admin' && !isAdmin) {
+      setActiveTab(isModeratorLike ? 'moderator' : 'calls');
+      return;
+    }
+    if (activeTab === 'moderator' && !isModeratorLike) {
+      setActiveTab('calls');
+    }
+  }, [activeTab, isAdmin, isModeratorLike]);
 
   const setupWebRTC = async (call: Call, localUserId: string) => {
     try {
@@ -675,7 +700,12 @@ export const App: React.FC = () => {
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
-          <NavItem active={activeTab === 'admin'} label="Admin" onClick={() => setActiveTab('admin')} />
+          {isModeratorLike && (
+            <NavItem active={activeTab === 'moderator'} label="Moderator" onClick={() => setActiveTab('moderator')} />
+          )}
+          {isAdmin && (
+            <NavItem active={activeTab === 'admin'} label="Admin" onClick={() => setActiveTab('admin')} />
+          )}
         </div>
 
         <div style={styles.sidebarFooter}>
@@ -771,33 +801,49 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'admin' && (
-            <AdminPanel
-              isAdminLike={isAdminLike}
+          {activeTab === 'moderator' && (
+            <ModeratorPage
+              isModeratorLike={isModeratorLike}
               role={currentUser.role}
+              loading={moderator.moderatorLoading}
+              moderatorOverview={moderator.moderatorOverview}
+              callFlags={moderator.callFlags}
+              callFlagsStatus={moderator.callFlagsStatus}
+              setCallFlagsStatus={moderator.setCallFlagsStatus}
+              callFlagsQuery={moderator.callFlagsQuery}
+              setCallFlagsQuery={moderator.setCallFlagsQuery}
+              callFlagsOffset={moderator.callFlagsOffset}
+              setCallFlagsOffset={moderator.setCallFlagsOffset}
+              callFlagsLimit={moderator.callFlagsLimit}
+              callFlagsTotal={moderator.callFlagsTotal}
+              callFlagsSortBy={moderator.callFlagsSortBy}
+              setCallFlagsSortBy={moderator.setCallFlagsSortBy}
+              callFlagsSortDir={moderator.callFlagsSortDir}
+              setCallFlagsSortDir={moderator.setCallFlagsSortDir}
+              onReloadModerator={moderator.loadModeratorData}
+              onForceEndCall={moderator.forceEndCall}
+              onFlagCall={moderator.flagCall}
+              onResolveCallFlag={moderator.resolveCallFlag}
+              onResolveAllFlagsForCall={moderator.resolveAllFlagsForCall}
+            />
+          )}
+
+          {activeTab === 'admin' && (
+            <AdminPage
+              isAdmin={isAdmin}
+              currentUserId={currentUser.id}
+              loading={admin.adminLoading}
               adminDashboard={admin.adminDashboard}
               adminAnalytics={admin.adminAnalytics}
               adminSlaSummary={admin.adminSlaSummary}
               adminReports={admin.adminReports}
               adminLogs={admin.adminLogs}
               adminUsers={admin.adminUsers}
+              adminSessions={admin.adminSessions}
+              adminSecurityActivity={admin.adminSecurityActivity}
+              adminTrafficLogs={admin.adminTrafficLogs}
               mlStatus={admin.mlStatus}
               mlMetrics={admin.mlMetrics}
-              adminLoading={admin.adminLoading}
-              moderatorOverview={admin.moderatorOverview}
-              callFlags={admin.callFlags}
-              callFlagsStatus={admin.callFlagsStatus}
-              setCallFlagsStatus={admin.setCallFlagsStatus}
-              callFlagsQuery={admin.callFlagsQuery}
-              setCallFlagsQuery={admin.setCallFlagsQuery}
-              callFlagsOffset={admin.callFlagsOffset}
-              setCallFlagsOffset={admin.setCallFlagsOffset}
-              callFlagsLimit={admin.callFlagsLimit}
-              callFlagsTotal={admin.callFlagsTotal}
-              callFlagsSortBy={admin.callFlagsSortBy}
-              setCallFlagsSortBy={admin.setCallFlagsSortBy}
-              callFlagsSortDir={admin.callFlagsSortDir}
-              setCallFlagsSortDir={admin.setCallFlagsSortDir}
               blacklist={admin.blacklist}
               blacklistPhone={admin.blacklistPhone}
               setBlacklistPhone={admin.setBlacklistPhone}
@@ -808,10 +854,7 @@ export const App: React.FC = () => {
               onAddBlacklist={admin.handleAddBlacklist}
               onDeleteBlacklist={admin.deleteBlacklist}
               onUpdateUserRole={admin.updateRole}
-              onForceEndCall={admin.forceEndCall}
-              onFlagCall={admin.flagCall}
-              onResolveCallFlag={admin.resolveCallFlag}
-              onResolveAllFlagsForCall={admin.resolveAllFlagsForCall}
+              onDeleteUser={admin.deleteUser}
             />
           )}
         </div>

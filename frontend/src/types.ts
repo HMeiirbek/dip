@@ -31,6 +31,8 @@ export interface Call {
   createdAt: string;
   startedAt?: string;
   endedAt?: string;
+  caller?: { id: string; username: string };
+  callee?: { id: string; username: string };
 }
 
 // WebRTC types
@@ -148,6 +150,99 @@ export interface AdminUser {
   id: string;
   username: string;
   createdAt?: string;
+  role: string;
+  verified: boolean;
+  activeSessions: number;
+  totalSessions: number;
+  totalCalls: number;
+  reportsSubmitted: number;
+  lastSeenAt?: string | null;
+  online: boolean;
+}
+
+export interface AdminManagedSession {
+  id: string;
+  userId: string;
+  username: string;
+  role: string;
+  deviceInfo: string;
+  ipAddress: string;
+  userAgent: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  active: boolean;
+}
+
+export interface AdminSecurityEvent {
+  userId: string;
+  username: string;
+  action: string;
+  createdAt: string;
+  ipAddress?: string;
+  deviceInfo?: string;
+}
+
+export interface AdminTrafficLog {
+  id: string;
+  callId: string;
+  userId: string;
+  username: string;
+  createdAt: string;
+  rttMs: number | null;
+  jitterMs: number | null;
+  packetLossPct: number | null;
+  mosLike: number | null;
+  bitrateKbps: number | null;
+  callStatus: string;
+  callerUsername: string;
+  calleeUsername: string;
+}
+
+export interface AdminUserDetail {
+  user: {
+    id: string;
+    username: string;
+    createdAt: string;
+    role: string;
+    verified: boolean;
+    online: boolean;
+  };
+  presence: Array<{
+    userId: string;
+    socketId: string;
+    connectedAt: string;
+  }>;
+  stats: {
+    totalCalls: number;
+    initiatedCalls: number;
+    receivedCalls: number;
+    reportsSubmitted: number;
+    activeSessions: number;
+    openFlags: number;
+  };
+  sessions: SecuritySession[];
+  securityActivity: Array<{
+    action: string;
+    createdAt: string;
+    ipAddress?: string;
+    deviceInfo?: string;
+  }>;
+  callHistory: Array<{
+    id: string;
+    status: string;
+    createdAt: string;
+    startedAt?: string;
+    endedAt?: string;
+    durationSec: number;
+    direction: 'incoming' | 'outgoing';
+    counterpart: {
+      id: string;
+      username: string;
+    };
+  }>;
+  reports: ReportItem[];
 }
 
 export interface AdminDashboard {

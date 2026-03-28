@@ -4,8 +4,11 @@ import {
   AdminAnalytics,
   AdminDashboard,
   AdminLogItem,
+  AdminManagedSession,
   AdminReports,
+  AdminSecurityEvent,
   AdminSlaSummary,
+  AdminTrafficLog,
   AdminUser,
   BlacklistEntry,
   MlMetrics,
@@ -25,12 +28,13 @@ type NotifyFn = (message: string) => void;
 
 export function useControlCenterData(params: {
   currentUser: User | null;
-  isAdminLike: boolean;
+  isAdmin: boolean;
+  isModeratorLike: boolean;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
   notify: NotifyFn;
   notifyError: NotifyFn;
 }) {
-  const { currentUser, isAdminLike, setCurrentUser, notify, notifyError } = params;
+  const { currentUser, isAdmin, isModeratorLike, setCurrentUser, notify, notifyError } = params;
 
   const [securitySessions, setSecuritySessions] = useState<SecuritySession[]>([]);
   const [securityActivity, setSecurityActivity] = useState<SecurityActivityItem[]>([]);
@@ -53,12 +57,16 @@ export function useControlCenterData(params: {
   const [adminReports, setAdminReports] = useState<AdminReports | null>(null);
   const [adminLogs, setAdminLogs] = useState<AdminLogItem[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminSessions, setAdminSessions] = useState<AdminManagedSession[]>([]);
+  const [adminSecurityActivity, setAdminSecurityActivity] = useState<AdminSecurityEvent[]>([]);
+  const [adminTrafficLogs, setAdminTrafficLogs] = useState<AdminTrafficLog[]>([]);
   const [mlStatus, setMlStatus] = useState<MlStatus | null>(null);
   const [mlMetrics, setMlMetrics] = useState<MlMetrics | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
   const [blacklistPhone, setBlacklistPhone] = useState('');
   const [blacklistReason, setBlacklistReason] = useState('');
+  const [moderatorLoading, setModeratorLoading] = useState(false);
   const [moderatorOverview, setModeratorOverview] = useState<ModeratorOverview | null>(null);
   const [callFlags, setCallFlags] = useState<ModeratorCallFlag[]>([]);
   const [callFlagsStatus, setCallFlagsStatus] = useState<'open' | 'resolved' | 'all'>('open');
@@ -102,20 +110,11 @@ export function useControlCenterData(params: {
     }
   };
 
-  const loadAdminData = async () => {
-    if (!isAdminLike) return;
-    setAdminLoading(true);
+  const loadModeratorData = async () => {
+    if (!isModeratorLike) return;
+    setModeratorLoading(true);
     try {
-      const [dashboard, analytics, slaSummary, reports, logs, users, mlS, mlM, bl, modOverview, flagsPage] = await Promise.all([
-        apiService.getAdminDashboard(),
-        apiService.getAdminAnalytics(),
-        apiService.getAdminSlaSummary(),
-        apiService.getAdminReports(),
-        apiService.getAdminSystemLogs(),
-        apiService.getAdminUsers(),
-        apiService.getMlStatus(),
-        apiService.getMlMetrics(),
-        apiService.getAdminBlacklist(),
+      const [modOverview, flagsPage] = await Promise.all([
         apiService.getModeratorOverview(),
         apiService.getAdminCallFlags(
           callFlagsStatus,
@@ -126,6 +125,34 @@ export function useControlCenterData(params: {
           callFlagsSortDir,
         ),
       ]);
+      setModeratorOverview(modOverview || null);
+      setCallFlags(flagsPage?.items || []);
+      setCallFlagsTotal(flagsPage?.total || 0);
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
+    } finally {
+      setModeratorLoading(false);
+    }
+  };
+
+  const loadAdminData = async () => {
+    if (!isAdmin) return;
+    setAdminLoading(true);
+    try {
+      const [dashboard, analytics, slaSummary, reports, logs, users, mlS, mlM, bl, sessions, securityActivity, trafficLogs] = await Promise.all([
+        apiService.getAdminDashboard(),
+        apiService.getAdminAnalytics(),
+        apiService.getAdminSlaSummary(),
+        apiService.getAdminReports(),
+        apiService.getAdminSystemLogs(),
+        apiService.getAdminUsers(),
+        apiService.getMlStatus(),
+        apiService.getMlMetrics(),
+        apiService.getAdminBlacklist(),
+        apiService.getAdminSessions(),
+        apiService.getAdminSecurityActivity(),
+        apiService.getAdminTrafficLogs(),
+      ]);
       setAdminDashboard(dashboard);
       setAdminAnalytics(analytics);
       setAdminSlaSummary(slaSummary);
@@ -135,9 +162,9 @@ export function useControlCenterData(params: {
       setMlStatus(mlS);
       setMlMetrics(mlM);
       setBlacklist(bl || []);
-      setModeratorOverview(modOverview || null);
-      setCallFlags(flagsPage?.items || []);
-      setCallFlagsTotal(flagsPage?.total || 0);
+      setAdminSessions(sessions || []);
+      setAdminSecurityActivity(securityActivity || []);
+      setAdminTrafficLogs(trafficLogs || []);
     } catch (e) {
       notifyError(getAxiosErrorMessage(e));
     } finally {
@@ -202,7 +229,8 @@ export function useControlCenterData(params: {
       setReportPhone('');
       setReportDescription('');
       await loadRiskData();
-      if (isAdminLike) await loadAdminData();
+      if (isAdmin) await loadAdminData();
+      if (isModeratorLike) await loadModeratorData();
     } catch (e) {
       notifyError(getAxiosErrorMessage(e));
     }
@@ -243,30 +271,41 @@ export function useControlCenterData(params: {
   const updateRole = async (id: string, role: 'user' | 'admin' | 'moderator') => {
     await apiService.updateUserRole(id, role);
     await loadAdminData();
+    if (isModeratorLike) await loadModeratorData();
+  };
+
+  const deleteUser = async (id: string) => {
+    await apiService.deleteAdminUser(id);
+    notify('User deleted');
+    await loadAdminData();
   };
 
   const forceEndCall = async (id: string) => {
     await apiService.forceEndAdminCall(id);
     notify('Call force-ended');
-    await loadAdminData();
+    await loadModeratorData();
+    if (isAdmin) await loadAdminData();
   };
 
   const flagCall = async (id: string, reason?: string) => {
     await apiService.flagAdminCall(id, reason);
     notify('Call flagged for review');
-    await loadAdminData();
+    await loadModeratorData();
+    if (isAdmin) await loadAdminData();
   };
 
   const resolveCallFlag = async (flagId: string) => {
     await apiService.resolveAdminCallFlag(flagId);
     notify('Flag resolved');
-    await loadAdminData();
+    await loadModeratorData();
+    if (isAdmin) await loadAdminData();
   };
 
   const resolveAllFlagsForCall = async (callId: string) => {
     const result = await apiService.resolveAllAdminCallFlags(callId);
     notify(`Resolved ${result.resolved} flags`);
-    await loadAdminData();
+    await loadModeratorData();
+    if (isAdmin) await loadAdminData();
   };
 
   return {
@@ -303,18 +342,9 @@ export function useControlCenterData(params: {
       handleCheckNumber,
       handleReportNumber,
     },
-    admin: {
-      adminDashboard,
-      adminAnalytics,
-      adminSlaSummary,
-      adminReports,
-      adminLogs,
-      adminUsers,
-      mlStatus,
-      mlMetrics,
-      adminLoading,
-      blacklist,
+    moderator: {
       moderatorOverview,
+      moderatorLoading,
       callFlags,
       callFlagsStatus,
       setCallFlagsStatus,
@@ -328,6 +358,26 @@ export function useControlCenterData(params: {
       setCallFlagsSortBy,
       callFlagsSortDir,
       setCallFlagsSortDir,
+      loadModeratorData,
+      forceEndCall,
+      flagCall,
+      resolveCallFlag,
+      resolveAllFlagsForCall,
+    },
+    admin: {
+      adminDashboard,
+      adminAnalytics,
+      adminSlaSummary,
+      adminReports,
+      adminLogs,
+      adminUsers,
+      adminSessions,
+      adminSecurityActivity,
+      adminTrafficLogs,
+      mlStatus,
+      mlMetrics,
+      adminLoading,
+      blacklist,
       blacklistPhone,
       setBlacklistPhone,
       blacklistReason,
@@ -337,10 +387,7 @@ export function useControlCenterData(params: {
       handleReloadMl,
       deleteBlacklist,
       updateRole,
-      forceEndCall,
-      flagCall,
-      resolveCallFlag,
-      resolveAllFlagsForCall,
+      deleteUser,
     },
     meta: {
       currentUser,
