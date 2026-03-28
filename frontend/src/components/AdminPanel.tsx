@@ -98,6 +98,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onResolveCallFlag,
   onResolveAllFlagsForCall,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 840px)');
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [qualityHistory, setQualityHistory] = useState<AdminCallQualityHistory | null>(null);
   const [alertFilter, setAlertFilter] = useState<'all' | 'warning' | 'critical' | 'clean'>('all');
@@ -230,7 +231,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }
 
   return (
-    <div style={styles.grid2}>
+    <div style={{ ...styles.grid2, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
       <div style={styles.card}>
         <h3 style={styles.cardTitle}>Dashboard / Analytics</h3>
         <div style={styles.row}>
@@ -292,7 +293,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         <h4 style={{ marginTop: 12 }}>Current Calls</h4>
         <div style={styles.row}>
-          <span style={{ fontSize: 12, color: '#3d5482' }}>Filter by quality:</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Filter by quality:</span>
           <select
             value={alertFilter}
             onChange={(e) => setAlertFilter(e.target.value as 'all' | 'warning' | 'critical' | 'clean')}
@@ -436,7 +437,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Resolve All Flags For Selected Call
             </button>
           </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#4a5f8a' }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
             {qualityHistory?.call
               ? `${qualityHistory.call.caller.username} -> ${qualityHistory.call.callee.username} (${qualityHistory.call.status})`
               : 'Select an active call to inspect trend'}
@@ -459,7 +460,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               thresholdMode="above"
             />
           </div>
-          <div style={{ marginTop: 10, fontSize: 12, color: '#38507e' }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
             <strong>Trend status:</strong>{' '}
             RTT {renderTrendBadge(qualityHistory?.summary?.trends.rttMs.status)} |{' '}
             Jitter {renderTrendBadge(qualityHistory?.summary?.trends.jitterMs.status)} |{' '}
@@ -483,7 +484,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {event.actorName || 'system'}: {event.message}
                   </small>
                   {event.metadata && (
-                    <small style={{ color: '#6177a0' }}>
+                  <small style={{ color: 'var(--muted)' }}>
                       {JSON.stringify(event.metadata)}
                     </small>
                   )}
@@ -569,10 +570,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
-            <span style={{ fontSize: 12, color: '#4c618a' }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
               Page {safeFlagsPage}/{flagsTotalPages}
             </span>
-            {adminLoading && <span style={{ fontSize: 12, color: '#3f5788' }}>Loading...</span>}
+            {adminLoading && <span style={{ fontSize: 12, color: 'var(--muted)' }}>Loading...</span>}
             <button
               style={styles.smallButton}
               disabled={safeFlagsPage <= 1}
@@ -686,7 +687,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <h4 style={{ marginTop: 0 }}>Force End Call</h4>
-            <p style={{ marginTop: 0, fontSize: 13, color: '#425784' }}>
+            <p style={{ marginTop: 0, fontSize: 13, color: 'var(--muted)' }}>
               End call <code>{forceEndTarget}</code> for both participants?
             </p>
             <div style={styles.row}>
@@ -713,7 +714,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
             <h4 style={{ marginTop: 0 }}>Flag Call</h4>
-            <p style={{ marginTop: 0, fontSize: 13, color: '#425784' }}>
+            <p style={{ marginTop: 0, fontSize: 13, color: 'var(--muted)' }}>
               Add moderation reason for call <code>{flagTarget}</code>.
             </p>
             <input
@@ -749,58 +750,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
-  card: { background: '#fff', borderRadius: 12, padding: 14, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' },
+  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
+  card: { background: 'var(--surface)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)', border: '1px solid var(--border)', color: 'var(--text)' },
   cardTitle: { marginTop: 0, marginBottom: 10 },
   row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
   stack: { display: 'flex', flexDirection: 'column', gap: 8 },
-  input: { padding: '8px 10px', border: '1px solid #c5d1e8', borderRadius: 8, minWidth: 180 },
-  select: { padding: '6px 10px', border: '1px solid #c5d1e8', borderRadius: 8, minWidth: 140, background: '#fff' },
+  input: { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, minWidth: 180, background: 'var(--surface)', color: 'var(--text)' },
+  select: { padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 8, minWidth: 140, background: 'var(--surface)', color: 'var(--text)' },
   listBox: {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     maxHeight: 260,
     overflowY: 'auto',
-    border: '1px solid #e5ebf5',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: 8,
-    background: '#fbfdff',
+    background: 'var(--surface2)',
   },
   listItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    borderBottom: '1px solid #eef2f9',
+    borderBottom: '1px solid var(--border)',
     paddingBottom: 6,
   },
-  listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid #eef2f9', paddingBottom: 6 },
-  metaRow: { display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: '#334e7d' },
-  tableWrap: { overflowX: 'auto', border: '1px solid #e5ebf5', borderRadius: 8, background: '#fbfdff' },
+  listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 6 },
+  metaRow: { display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--muted)' },
+  tableWrap: { overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface2)' },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: 12,
   },
-  selectedRow: { background: '#edf5ff', cursor: 'pointer' },
+  selectedRow: { background: 'rgba(12,108,255,0.10)', cursor: 'pointer' },
   qualityGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
   metricCard: {
     display: 'flex',
     flexDirection: 'column',
     gap: 2,
-    border: '1px solid #e5ebf5',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: 8,
-    background: '#f9fcff',
+    background: 'var(--surface2)',
     fontSize: 12,
   },
   alertBox: {
     marginTop: 10,
-    border: '1px solid #e5ebf5',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: 8,
-    background: '#fff',
+    background: 'var(--surface)',
   },
   alertList: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, maxHeight: 160, overflowY: 'auto' },
   alertItem: { display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 },
@@ -810,7 +811,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     padding: '2px 6px',
     borderRadius: 10,
-    background: '#f59e0b',
+    background: 'var(--warn)',
     color: '#fff',
     fontWeight: 700,
     fontSize: 11,
@@ -821,14 +822,14 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     padding: '2px 6px',
     borderRadius: 10,
-    background: '#dc2626',
+    background: 'var(--danger)',
     color: '#fff',
     fontWeight: 700,
     fontSize: 11,
   },
   pre: {
-    background: '#0d1117',
-    color: '#c9d1d9',
+    background: 'rgba(13,17,23,0.75)',
+    color: 'rgba(233,239,255,0.92)',
     padding: 10,
     borderRadius: 8,
     fontSize: 12,
@@ -836,10 +837,10 @@ const styles: Record<string, React.CSSProperties> = {
     maxHeight: 240,
     overflowY: 'auto',
   },
-  primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: '#0c6cff', color: '#fff', cursor: 'pointer', fontWeight: 700 },
-  secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid #b5c3de', background: '#fff', color: '#1a3369', cursor: 'pointer', fontWeight: 700 },
-  smallButton: { padding: '4px 8px', borderRadius: 6, border: '1px solid #b5c3de', background: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12 },
-  smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: '#d6223b', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12 },
+  primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontWeight: 800 },
+  secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 800 },
+  smallButton: { padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontWeight: 800, fontSize: 12, color: 'var(--text)' },
+  smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--danger)', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 },
   modalBackdrop: {
     position: 'fixed',
     inset: 0,
@@ -851,15 +852,37 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modalCard: {
     width: 'min(520px, calc(100vw - 32px))',
-    background: '#fff',
+    background: 'var(--surface)',
     borderRadius: 12,
     padding: 16,
-    boxShadow: '0 18px 60px rgba(0,0,0,0.25)',
+    boxShadow: 'var(--shadow-strong)',
+    border: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
   },
 };
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    }
+    mql.addListener(onChange);
+    return () => mql.removeListener(onChange);
+  }, [query]);
+
+  return matches;
+}
 
 function formatDuration(totalSec: number) {
   const h = Math.floor(totalSec / 3600);
@@ -917,17 +940,21 @@ const QualitySparkline: React.FC<{
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#38507e', marginBottom: 2 }}>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 2 }}>
         {label} | min {min.toFixed(1)} / max {max.toFixed(1)}
       </div>
-      <svg width={width} height={height} style={{ background: '#f8fbff', border: '1px solid #e5ebf5', borderRadius: 6 }}>
+      <svg
+        width={width}
+        height={height}
+        style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6 }}
+      >
         {threshold !== undefined && (
           <line
             x1={0}
             y1={height - 4 - ((threshold - min) / range) * (height - 8)}
             x2={width}
             y2={height - 4 - ((threshold - min) / range) * (height - 8)}
-            stroke="#9ca3af"
+            stroke="rgba(148, 163, 184, 0.9)"
             strokeDasharray="4 3"
             strokeWidth="1"
           />
@@ -936,7 +963,7 @@ const QualitySparkline: React.FC<{
         {pointList
           .filter((p) => isAnomaly(p.value))
           .map((p, i) => (
-            <circle key={`${label}-anomaly-${i}`} cx={p.x} cy={p.y} r="2.8" fill="#dc2626" />
+            <circle key={`${label}-anomaly-${i}`} cx={p.x} cy={p.y} r="2.8" fill="var(--danger)" />
           ))}
       </svg>
     </div>

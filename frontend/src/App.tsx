@@ -6,6 +6,7 @@ import { CallsPanel } from './components/CallsPanel';
 import { SecurityPanel } from './components/SecurityPanel';
 import { RiskPanel } from './components/RiskPanel';
 import { AdminPanel } from './components/AdminPanel';
+import { UserDrawer } from './components/UserPage';
 import { useControlCenterData } from './hooks/useControlCenterData';
 import {
   User,
@@ -17,6 +18,7 @@ import {
 } from './types';
 
 type TabKey = 'calls' | 'security' | 'risk' | 'admin';
+type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
   (value || '')
@@ -62,6 +64,13 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('calls');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const currentUserRef = useRef<User | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('theme') as ThemeMode | null;
+    if (saved === 'light' || saved === 'dark') return saved;
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
+    return prefersDark ? 'dark' : 'light';
+  });
 
   const [callStatus, setCallStatus] = useState<CallStatusType>('idle');
   const [activeCall, setActiveCall] = useState<Call | null>(null);
@@ -89,6 +98,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     activeCallRef.current = activeCall;
@@ -647,346 +661,360 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div style={styles.app}>
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div>
-            <h1 style={styles.appTitle}>DIP Control Center</h1>
-            <p style={styles.appSubtitle}>Calls, security, risk and admin tools</p>
-          </div>
-          <div style={styles.headerActions}>
-            <span style={styles.username}>
-              {currentUser.username} {currentUser.role ? `(${currentUser.role})` : ''}
-            </span>
-            <button onClick={handleRefreshAuth} style={styles.secondaryButton}>Refresh Token</button>
-            <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
+    <div style={styles.appShell}>
+      <aside style={styles.sidebar}>
+        <div style={styles.brand}>
+          <div style={styles.brandDot} />
+          <div style={styles.brandText}>
+            <div style={styles.brandTitle}>DIP</div>
+            <div style={styles.brandSub}>control</div>
           </div>
         </div>
 
-        <div style={styles.tabBar}>
-          <button style={tabStyle(activeTab === 'calls')} onClick={() => setActiveTab('calls')}>Calls</button>
-          <button style={tabStyle(activeTab === 'security')} onClick={() => setActiveTab('security')}>Security</button>
-          <button style={tabStyle(activeTab === 'risk')} onClick={() => setActiveTab('risk')}>Risk</button>
-          <button style={tabStyle(activeTab === 'admin')} onClick={() => setActiveTab('admin')}>Admin</button>
+        <div style={styles.nav}>
+          <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
+          <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
+          <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
+          <NavItem active={activeTab === 'admin'} label="Admin" onClick={() => setActiveTab('admin')} />
+        </div>
+
+        <div style={styles.sidebarFooter}>
+          <button type="button" style={styles.profileBtn} onClick={() => setProfileOpen(true)} title="Profile">
+            <span style={styles.profileAvatar} aria-hidden="true">
+              {(currentUser.username?.[0] || 'U').toUpperCase()}
+            </span>
+            <span style={styles.profileText}>
+              <span style={styles.profileName}>{currentUser.username}</span>
+              <span style={styles.profileMeta}>{currentUser.role || 'user'}</span>
+            </span>
+          </button>
+        </div>
+      </aside>
+
+      <main style={styles.main}>
+        <div style={styles.topbar}>
+          <div style={styles.topbarLeft}>
+            <div style={styles.topbarTitle}>{activeTab.toUpperCase()}</div>
+            <div style={styles.topbarHint}>DIP Control Center</div>
+          </div>
+          <div style={styles.topbarActions}>
+            <button
+              type="button"
+              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              style={styles.topbarButton}
+              title="Toggle theme"
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+            <button onClick={handleRefreshAuth} style={styles.topbarButton}>Refresh</button>
+            <button onClick={handleLogout} style={styles.topbarDanger}>Logout</button>
+          </div>
         </div>
 
         {notice && <div style={styles.notice}>{notice}</div>}
         {error && <div style={styles.error}>{error}</div>}
 
-        {activeTab === 'calls' && (
-          <CallsPanel
-            currentUserId={currentUser.id}
-            onCall={initiateCall}
-            activeCallId={activeCall?.id || null}
-            callStatus={callStatus}
-            activeCall={activeCall}
-            incomingCall={incomingCall}
-            remoteUsername={remoteUsername}
-            onAccept={acceptCall}
-            onReject={rejectCall}
-            onEnd={endCall}
-            localStream={localStream}
-            remoteStream={remoteStream}
-          />
-        )}
+        <div style={styles.contentWrap}>
+          {activeTab === 'calls' && (
+            <CallsPanel
+              currentUserId={currentUser.id}
+              onCall={initiateCall}
+              activeCallId={activeCall?.id || null}
+              callStatus={callStatus}
+              activeCall={activeCall}
+              incomingCall={incomingCall}
+              remoteUsername={remoteUsername}
+              onAccept={acceptCall}
+              onReject={rejectCall}
+              onEnd={endCall}
+              localStream={localStream}
+              remoteStream={remoteStream}
+            />
+          )}
 
-        {activeTab === 'security' && (
-          <SecurityPanel
-            securitySessions={security.securitySessions}
-            securityActivity={security.securityActivity}
-            verifyCode={security.verifyCode}
-            setVerifyCode={security.setVerifyCode}
-            resetIdentifier={security.resetIdentifier}
-            setResetIdentifier={security.setResetIdentifier}
-            resetCode={security.resetCode}
-            setResetCode={security.setResetCode}
-            newPassword={security.newPassword}
-            setNewPassword={security.setNewPassword}
-            onRequestVerify={security.handleVerifyRequest}
-            onVerify={security.handleVerifySubmit}
-            onRefreshSecurity={security.loadSecurityData}
-            onTerminateSession={security.terminateSession}
-            onRequestResetCode={security.handleForgotPassword}
-            onResetPassword={security.handleResetPassword}
-          />
-        )}
+          {activeTab === 'security' && (
+            <SecurityPanel
+              securitySessions={security.securitySessions}
+              securityActivity={security.securityActivity}
+              verifyCode={security.verifyCode}
+              setVerifyCode={security.setVerifyCode}
+              resetIdentifier={security.resetIdentifier}
+              setResetIdentifier={security.setResetIdentifier}
+              resetCode={security.resetCode}
+              setResetCode={security.setResetCode}
+              newPassword={security.newPassword}
+              setNewPassword={security.setNewPassword}
+              onRequestVerify={security.handleVerifyRequest}
+              onVerify={security.handleVerifySubmit}
+              onRefreshSecurity={security.loadSecurityData}
+              onTerminateSession={security.terminateSession}
+              onRequestResetCode={security.handleForgotPassword}
+              onResetPassword={security.handleResetPassword}
+            />
+          )}
 
-        {activeTab === 'risk' && (
-          <RiskPanel
-            riskAnalysis={risk.riskAnalysis}
-            riskMonitor={risk.riskMonitor}
-            riskStats={risk.riskStats}
-            checkPhone={risk.checkPhone}
-            setCheckPhone={risk.setCheckPhone}
-            checkPhoneResult={risk.checkPhoneResult}
-            reportPhone={risk.reportPhone}
-            setReportPhone={risk.setReportPhone}
-            reportDescription={risk.reportDescription}
-            setReportDescription={risk.setReportDescription}
-            onReloadRisk={risk.loadRiskData}
-            onCheckNumber={risk.handleCheckNumber}
-            onReportNumber={risk.handleReportNumber}
-          />
-        )}
+          {activeTab === 'risk' && (
+            <RiskPanel
+              riskAnalysis={risk.riskAnalysis}
+              riskMonitor={risk.riskMonitor}
+              riskStats={risk.riskStats}
+              checkPhone={risk.checkPhone}
+              setCheckPhone={risk.setCheckPhone}
+              checkPhoneResult={risk.checkPhoneResult}
+              reportPhone={risk.reportPhone}
+              setReportPhone={risk.setReportPhone}
+              reportDescription={risk.reportDescription}
+              setReportDescription={risk.setReportDescription}
+              onReloadRisk={risk.loadRiskData}
+              onCheckNumber={risk.handleCheckNumber}
+              onReportNumber={risk.handleReportNumber}
+            />
+          )}
 
-        {activeTab === 'admin' && (
-          <AdminPanel
-            isAdminLike={isAdminLike}
-            role={currentUser.role}
-            adminDashboard={admin.adminDashboard}
-            adminAnalytics={admin.adminAnalytics}
-            adminSlaSummary={admin.adminSlaSummary}
-            adminReports={admin.adminReports}
-            adminLogs={admin.adminLogs}
-            adminUsers={admin.adminUsers}
-            mlStatus={admin.mlStatus}
-            mlMetrics={admin.mlMetrics}
-            adminLoading={admin.adminLoading}
-            moderatorOverview={admin.moderatorOverview}
-            callFlags={admin.callFlags}
-            callFlagsStatus={admin.callFlagsStatus}
-            setCallFlagsStatus={admin.setCallFlagsStatus}
-            callFlagsQuery={admin.callFlagsQuery}
-            setCallFlagsQuery={admin.setCallFlagsQuery}
-            callFlagsOffset={admin.callFlagsOffset}
-            setCallFlagsOffset={admin.setCallFlagsOffset}
-            callFlagsLimit={admin.callFlagsLimit}
-            callFlagsTotal={admin.callFlagsTotal}
-            callFlagsSortBy={admin.callFlagsSortBy}
-            setCallFlagsSortBy={admin.setCallFlagsSortBy}
-            callFlagsSortDir={admin.callFlagsSortDir}
-            setCallFlagsSortDir={admin.setCallFlagsSortDir}
-            blacklist={admin.blacklist}
-            blacklistPhone={admin.blacklistPhone}
-            setBlacklistPhone={admin.setBlacklistPhone}
-            blacklistReason={admin.blacklistReason}
-            setBlacklistReason={admin.setBlacklistReason}
-            onReloadAdmin={admin.loadAdminData}
-            onReloadMl={admin.handleReloadMl}
-            onAddBlacklist={admin.handleAddBlacklist}
-            onDeleteBlacklist={admin.deleteBlacklist}
-            onUpdateUserRole={admin.updateRole}
-            onForceEndCall={admin.forceEndCall}
-            onFlagCall={admin.flagCall}
-            onResolveCallFlag={admin.resolveCallFlag}
-            onResolveAllFlagsForCall={admin.resolveAllFlagsForCall}
-          />
-        )}
-      </div>
+          {activeTab === 'admin' && (
+            <AdminPanel
+              isAdminLike={isAdminLike}
+              role={currentUser.role}
+              adminDashboard={admin.adminDashboard}
+              adminAnalytics={admin.adminAnalytics}
+              adminSlaSummary={admin.adminSlaSummary}
+              adminReports={admin.adminReports}
+              adminLogs={admin.adminLogs}
+              adminUsers={admin.adminUsers}
+              mlStatus={admin.mlStatus}
+              mlMetrics={admin.mlMetrics}
+              adminLoading={admin.adminLoading}
+              moderatorOverview={admin.moderatorOverview}
+              callFlags={admin.callFlags}
+              callFlagsStatus={admin.callFlagsStatus}
+              setCallFlagsStatus={admin.setCallFlagsStatus}
+              callFlagsQuery={admin.callFlagsQuery}
+              setCallFlagsQuery={admin.setCallFlagsQuery}
+              callFlagsOffset={admin.callFlagsOffset}
+              setCallFlagsOffset={admin.setCallFlagsOffset}
+              callFlagsLimit={admin.callFlagsLimit}
+              callFlagsTotal={admin.callFlagsTotal}
+              callFlagsSortBy={admin.callFlagsSortBy}
+              setCallFlagsSortBy={admin.setCallFlagsSortBy}
+              callFlagsSortDir={admin.callFlagsSortDir}
+              setCallFlagsSortDir={admin.setCallFlagsSortDir}
+              blacklist={admin.blacklist}
+              blacklistPhone={admin.blacklistPhone}
+              setBlacklistPhone={admin.setBlacklistPhone}
+              blacklistReason={admin.blacklistReason}
+              setBlacklistReason={admin.setBlacklistReason}
+              onReloadAdmin={admin.loadAdminData}
+              onReloadMl={admin.handleReloadMl}
+              onAddBlacklist={admin.handleAddBlacklist}
+              onDeleteBlacklist={admin.deleteBlacklist}
+              onUpdateUserRole={admin.updateRole}
+              onForceEndCall={admin.forceEndCall}
+              onFlagCall={admin.flagCall}
+              onResolveCallFlag={admin.resolveCallFlag}
+              onResolveAllFlagsForCall={admin.resolveAllFlagsForCall}
+            />
+          )}
+        </div>
+
+        <UserDrawer
+          open={profileOpen}
+          user={currentUser}
+          onClose={() => setProfileOpen(false)}
+          onLogout={async () => {
+            setProfileOpen(false);
+            await handleLogout();
+          }}
+          onRefreshAuth={handleRefreshAuth}
+          onNavigate={(tab) => {
+            setActiveTab(tab);
+            setProfileOpen(false);
+          }}
+        />
+      </main>
     </div>
   );
 };
 
-const tabStyle = (active: boolean): React.CSSProperties => ({
-  padding: '10px 16px',
-  borderRadius: 8,
-  border: active ? '2px solid #0c6cff' : '1px solid #d0d0d0',
-  background: active ? '#ebf3ff' : '#fff',
-  fontWeight: 600,
-  cursor: 'pointer',
-});
+const NavItem: React.FC<{ active: boolean; label: string; onClick: () => void }> = ({
+  active,
+  label,
+  onClick,
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...styles.navItem,
+        ...(active ? styles.navItemActive : null),
+      }}
+    >
+      <span style={styles.navPill(active)} aria-hidden="true" />
+      <span style={styles.navLabel}>{label}</span>
+    </button>
+  );
+};
 
-const styles: Record<string, React.CSSProperties> = {
-  app: {
+const styles: Record<string, any> = {
+  appShell: {
     minHeight: '100vh',
-    background: 'linear-gradient(160deg, #f2f7ff 0%, #f8fff4 100%)',
-    padding: 16,
-  },
-  container: {
-    maxWidth: 1280,
-    margin: '0 auto',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-  },
-  headerActions: {
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
-  },
-  appTitle: {
-    margin: 0,
-    fontSize: 28,
-    color: '#0f1f44',
-  },
-  appSubtitle: {
-    margin: '4px 0 0 0',
-    fontSize: 13,
-    color: '#4f5d7a',
-  },
-  tabBar: {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 12,
-    flexWrap: 'wrap',
-  },
-  notice: {
-    background: '#e8fff1',
-    border: '1px solid #8ce7ae',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    color: '#0f6d35',
-    fontWeight: 600,
-  },
-  error: {
-    background: '#ffeff0',
-    border: '1px solid #ff9fa6',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    color: '#a01828',
-    fontWeight: 600,
-  },
-  username: {
-    marginRight: 6,
-    fontWeight: 600,
-  },
-  logoutButton: {
-    padding: '8px 12px',
-    borderRadius: 8,
-    border: 'none',
-    background: '#d6223b',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-  primaryButton: {
-    padding: '8px 12px',
-    borderRadius: 8,
-    border: 'none',
-    background: '#0c6cff',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-  secondaryButton: {
-    padding: '8px 12px',
-    borderRadius: 8,
-    border: '1px solid #b5c3de',
-    background: '#fff',
-    color: '#1a3369',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-  smallButton: {
-    padding: '4px 8px',
-    borderRadius: 6,
-    border: '1px solid #b5c3de',
-    background: '#fff',
-    cursor: 'pointer',
-    fontWeight: 700,
-    fontSize: 12,
-  },
-  smallDanger: {
-    padding: '4px 8px',
-    borderRadius: 6,
-    border: 'none',
-    background: '#d6223b',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 700,
-    fontSize: 12,
-  },
-  content: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
+    gridTemplateColumns: '260px 1fr',
   },
-  leftPanel: {
-    minHeight: 360,
-  },
-  rightPanel: {
+  sidebar: {
+    background: 'var(--sidebar-bg)',
+    borderRight: '1px solid var(--border)',
+    padding: 12,
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
   },
-  statusSection: {
+  brand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    background: 'var(--panel-bg2)',
+    border: '1px solid var(--border)',
+  },
+  brandDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    background: 'var(--primary)',
+    boxShadow: '0 0 0 4px rgba(88, 101, 242, 0.18)',
+  },
+  brandText: { display: 'flex', flexDirection: 'column' },
+  brandTitle: { fontWeight: 900, color: 'var(--text)', letterSpacing: 0.2 },
+  brandSub: { fontSize: 12, color: 'var(--muted)', marginTop: 2 },
+
+  nav: { display: 'flex', flexDirection: 'column', gap: 6 },
+  navItem: {
+    width: '100%',
+    border: '1px solid transparent',
+    background: 'transparent',
+    color: 'var(--text)',
+    borderRadius: 10,
+    padding: '10px 10px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontWeight: 800,
+  },
+  navItemActive: {
+    background: 'rgba(88, 101, 242, 0.14)',
+    border: '1px solid rgba(88, 101, 242, 0.25)',
+  },
+  navPill: (active: boolean) =>
+    ({
+      width: 4,
+      height: 18,
+      borderRadius: 999,
+      background: active ? 'var(--primary)' : 'rgba(181,186,193,0.45)',
+    }) as React.CSSProperties,
+  navLabel: { flex: 1, textAlign: 'left' as const },
+
+  sidebarFooter: { marginTop: 'auto', paddingTop: 6 },
+  profileBtn: {
+    width: '100%',
+    display: 'flex',
+    gap: 10,
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    background: 'var(--panel-bg2)',
+    border: '1px solid var(--border)',
+    cursor: 'pointer',
+    color: 'var(--text)',
+  },
+  profileAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    background: 'linear-gradient(135deg, var(--primary) 0%, var(--success) 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 220,
+    fontWeight: 900,
+    color: '#fff',
+    flex: '0 0 auto',
   },
-  card: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-  },
-  cardTitle: {
-    marginTop: 0,
-    marginBottom: 10,
-  },
-  audioGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+  profileText: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  profileName: { fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  profileMeta: { fontSize: 12, color: 'var(--muted)', textAlign: 'left' as const },
+
+  main: {
+    padding: 12,
+    display: 'flex',
+    flexDirection: 'column',
     gap: 10,
   },
-  grid2: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
-  },
-  row: {
+  topbar: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    background: 'var(--topbar-bg)',
+    border: '1px solid var(--border)',
+    borderRadius: 14,
+    padding: 12,
     display: 'flex',
-    gap: 8,
     alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 8,
-  },
-  stack: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  input: {
-    padding: '8px 10px',
-    border: '1px solid #c5d1e8',
-    borderRadius: 8,
-    minWidth: 180,
-  },
-  listBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    maxHeight: 260,
-    overflowY: 'auto',
-    border: '1px solid #e5ebf5',
-    borderRadius: 8,
-    padding: 8,
-    background: '#fbfdff',
-  },
-  listItem: {
-    display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    borderBottom: '1px solid #eef2f9',
-    paddingBottom: 6,
+    gap: 12,
+    backdropFilter: 'blur(10px)',
   },
-  listItemColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-    borderBottom: '1px solid #eef2f9',
-    paddingBottom: 6,
+  topbarLeft: { display: 'flex', flexDirection: 'column' },
+  topbarTitle: { fontWeight: 950, letterSpacing: 0.8, fontSize: 14, color: 'var(--text)' },
+  topbarHint: { fontSize: 12, color: 'var(--muted)', marginTop: 2 },
+  topbarActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  topbarButton: {
+    padding: '8px 12px',
+    borderRadius: 10,
+    border: '1px solid var(--border)',
+    background: 'var(--panel-bg2)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontWeight: 800,
   },
-  pre: {
-    background: '#0d1117',
-    color: '#c9d1d9',
-    padding: 10,
+  topbarDanger: {
+    padding: '8px 12px',
+    borderRadius: 10,
+    border: '1px solid rgba(237, 66, 69, 0.35)',
+    background: 'rgba(237, 66, 69, 0.14)',
+    color: 'var(--text)',
+    cursor: 'pointer',
+    fontWeight: 900,
+  },
+  contentWrap: {
+    background: 'var(--panel-bg)',
+    border: '1px solid var(--border)',
+    borderRadius: 14,
+    padding: 12,
+    boxShadow: 'var(--shadow)',
+    minHeight: 420,
+  },
+  // Small responsive tweak: collapse sidebar on narrow screens
+  // (kept simple without routing/state; still looks Discord-ish on mobile)
+  // Applied at runtime via inline media query in JSX: handled by CSS grid below.
+  notice: {
+    background: 'rgba(35, 165, 90, 0.12)',
+    border: '1px solid rgba(35, 165, 90, 0.30)',
     borderRadius: 8,
-    fontSize: 12,
-    overflowX: 'auto',
-    maxHeight: 240,
-    overflowY: 'auto',
+    padding: 10,
+    marginBottom: 10,
+    color: 'var(--text)',
+    fontWeight: 600,
+  },
+  error: {
+    background: 'rgba(237, 66, 69, 0.12)',
+    border: '1px solid rgba(237, 66, 69, 0.30)',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    color: 'var(--text)',
+    fontWeight: 600,
   },
 };
 

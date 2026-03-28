@@ -41,7 +41,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>🔐 DIP</h1>
+        <h1 style={styles.title}>DIP</h1>
         <p style={styles.subtitle}>Secure Voice Communication</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -118,9 +118,10 @@ const styles = {
   } as React.CSSProperties,
 
   card: {
-    background: 'white',
+    background: 'var(--surface)',
     borderRadius: '12px',
-    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     padding: '40px',
     maxWidth: '400px',
     width: '100%',
@@ -128,14 +129,14 @@ const styles = {
 
   title: {
     textAlign: 'center' as const,
-    color: '#667eea',
+    color: 'var(--text)',
     marginBottom: '10px',
     fontSize: '32px',
   } as React.CSSProperties,
 
   subtitle: {
     textAlign: 'center' as const,
-    color: '#888',
+    color: 'var(--muted)',
     marginBottom: '30px',
     fontSize: '14px',
   } as React.CSSProperties,
@@ -155,17 +156,19 @@ const styles = {
   label: {
     fontSize: '14px',
     fontWeight: '600',
-    color: '#333',
+    color: 'var(--text)',
   } as React.CSSProperties,
 
   input: {
     padding: '12px',
     fontSize: '14px',
-    border: '1px solid #ddd',
+    border: '1px solid var(--border)',
     borderRadius: '6px',
     fontFamily: 'inherit',
     transition: 'border-color 0.2s',
     outline: 'none',
+    background: 'var(--surface)',
+    color: 'var(--text)',
   } as React.CSSProperties,
 
   button: {
@@ -173,7 +176,7 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     color: 'white',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, var(--primary) 0%, rgba(34,197,94,0.95) 100%)',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -184,7 +187,7 @@ const styles = {
     textAlign: 'center' as const,
     marginTop: '20px',
     fontSize: '14px',
-    color: '#666',
+    color: 'var(--muted)',
   } as React.CSSProperties,
 
   toggleText: {
@@ -194,7 +197,7 @@ const styles = {
   toggleButton: {
     background: 'none',
     border: 'none',
-    color: '#667eea',
+    color: 'var(--primary)',
     cursor: 'pointer',
     fontWeight: '600',
     textDecoration: 'underline',

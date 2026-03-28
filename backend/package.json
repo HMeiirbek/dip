@@ -10,8 +10,7 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "acceptance:report": "node scripts/acceptance_report.js"
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

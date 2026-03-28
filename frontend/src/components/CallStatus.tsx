@@ -113,10 +113,11 @@ const styles = {
   idle: {
     textAlign: 'center' as const,
     padding: '30px',
-    color: '#666',
-    background: 'white',
+    color: 'var(--muted)',
+    background: 'var(--surface)',
     borderRadius: '12px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     fontStyle: 'italic',
   } as React.CSSProperties,
 
@@ -126,12 +127,12 @@ const styles = {
   } as React.CSSProperties,
 
   incomingCard: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, var(--primary) 0%, rgba(34,197,94,0.95) 100%)',
     color: 'white',
     padding: '30px',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow-strong)',
     minWidth: '280px',
     animation: 'pulse 1.5s infinite',
   } as React.CSSProperties,
@@ -149,11 +150,12 @@ const styles = {
   } as React.CSSProperties,
 
   callingCard: {
-    background: 'white',
+    background: 'var(--surface)',
     padding: '40px 30px',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     minWidth: '280px',
   } as React.CSSProperties,
 
@@ -165,28 +167,29 @@ const styles = {
   callingText: {
     fontSize: '18px',
     fontWeight: '600',
-    color: '#333',
+    color: 'var(--text)',
     marginBottom: '20px',
   } as React.CSSProperties,
 
   spinner: {
     width: '30px',
     height: '30px',
-    border: '3px solid #f3f3f3',
-    borderTop: '3px solid #667eea',
+    border: '3px solid rgba(148, 163, 184, 0.35)',
+    borderTop: '3px solid var(--primary)',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
     margin: '0 auto',
   } as React.CSSProperties,
 
   activeCard: {
-    background: 'white',
+    background: 'var(--surface)',
     padding: '40px 30px',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     minWidth: '280px',
-    borderTop: '4px solid #27ae60',
+    borderTop: '4px solid var(--success)',
   } as React.CSSProperties,
 
   activeIcon: {
@@ -197,45 +200,47 @@ const styles = {
   activeUser: {
     fontSize: '20px',
     fontWeight: '600',
-    color: '#333',
+    color: 'var(--text)',
     marginBottom: '5px',
   } as React.CSSProperties,
 
   activeMeta: {
     fontSize: '12px',
-    color: '#888',
+    color: 'var(--muted)',
     marginBottom: '20px',
   } as React.CSSProperties,
 
   endedCard: {
-    background: 'white',
+    background: 'var(--surface)',
     padding: '40px 30px',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     minWidth: '280px',
   } as React.CSSProperties,
 
   endedIcon: {
     fontSize: '40px',
     marginBottom: '15px',
-    color: '#27ae60',
+    color: 'var(--success)',
   } as React.CSSProperties,
 
   endedText: {
     fontSize: '18px',
     fontWeight: '600',
-    color: '#333',
+    color: 'var(--text)',
   } as React.CSSProperties,
 
   errorCard: {
-    background: 'white',
+    background: 'var(--surface)',
     padding: '40px 30px',
     borderRadius: '12px',
     textAlign: 'center' as const,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
     minWidth: '280px',
-    borderTop: '4px solid #e74c3c',
+    borderTop: '4px solid var(--danger)',
   } as React.CSSProperties,
 
   errorIcon: {
@@ -246,7 +251,7 @@ const styles = {
   errorText: {
     fontSize: '18px',
     fontWeight: '600',
-    color: '#e74c3c',
+    color: 'var(--text)',
   } as React.CSSProperties,
 
   button: {
@@ -260,18 +265,18 @@ const styles = {
   } as React.CSSProperties,
 
   acceptButton: {
-    background: '#27ae60',
+    background: 'var(--success)',
     color: 'white',
     marginRight: '10px',
   } as React.CSSProperties,
 
   rejectButton: {
-    background: '#e74c3c',
+    background: 'var(--danger)',
     color: 'white',
   } as React.CSSProperties,
 
   endButton: {
-    background: '#e74c3c',
+    background: 'var(--danger)',
     color: 'white',
     width: '100%',
   } as React.CSSProperties,

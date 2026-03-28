@@ -1,0 +1,127 @@
+/* Discord-like theme tokens (light/dark). Default is dark-ish in layout. */
+:root {
+  --bg0: #f3f4f5;
+  --bg1: #eef0f3;
+  --surface: #ffffff;
+  --surface2: #f2f3f5;
+  --text: #060607;
+  --muted: #4e5058;
+  --border: rgba(78, 80, 88, 0.18);
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 18px 60px rgba(0, 0, 0, 0.22);
+  --primary: #5865f2; /* Discord blurple */
+  --danger: #ed4245;
+  --success: #23a55a;
+  --warn: #faa81a;
+
+  /* Layout surfaces */
+  --app-bg: linear-gradient(160deg, var(--bg0) 0%, var(--bg1) 100%);
+  --sidebar-bg: #e3e5e8;
+  --panel-bg: #ffffff;
+  --panel-bg2: #f2f3f5;
+  --topbar-bg: rgba(255, 255, 255, 0.86);
+
+  --radius: 12px;
+  --radius-lg: 14px;
+  --focus: 0 0 0 3px rgba(88, 101, 242, 0.28);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg0: #1e1f22;   /* app background */
+  --bg1: #1e1f22;
+  --surface: #313338; /* main panels */
+  --surface2: #2b2d31; /* raised/secondary */
+  --text: #f2f3f5;
+  --muted: #b5bac1;
+  --border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 10px 36px rgba(0, 0, 0, 0.35);
+  --shadow-strong: 0 18px 70px rgba(0, 0, 0, 0.55);
+  --primary: #5865f2;
+  --danger: #ed4245;
+  --success: #23a55a;
+  --warn: #faa81a;
+
+  --app-bg: linear-gradient(160deg, var(--bg0) 0%, var(--bg1) 100%);
+  --sidebar-bg: #1e1f22;
+  --panel-bg: #313338;
+  --panel-bg2: #2b2d31;
+  --topbar-bg: rgba(49, 51, 56, 0.92);
+  color-scheme: dark;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+    'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--app-bg);
+  color: var(--text);
+}
+
+small {
+  color: var(--muted);
+}
+
+/* Tables: keep headers/cells readable in dark mode */
+table {
+  color: var(--text);
+}
+
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-bg);
+  z-index: 1;
+}
+
+tbody tr:hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+

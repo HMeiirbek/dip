@@ -41,16 +41,17 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
 
 const styles = {
   container: {
-    background: 'white',
+    background: 'var(--surface)',
     borderRadius: '8px',
     padding: '15px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    boxShadow: 'var(--shadow)',
+    border: '1px solid var(--border)',
   } as React.CSSProperties,
 
   label: {
     fontSize: '12px',
     fontWeight: '600',
-    color: '#666',
+    color: 'var(--muted)',
     marginBottom: '8px',
     textTransform: 'uppercase' as const,
   } as React.CSSProperties,
@@ -62,7 +63,7 @@ const styles = {
   status: {
     marginTop: '10px',
     fontSize: '12px',
-    color: '#888',
+    color: 'var(--muted)',
     textAlign: 'center' as const,
   } as React.CSSProperties,
 };
