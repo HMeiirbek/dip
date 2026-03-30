@@ -3,12 +3,15 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppRole, SecurityService } from './security.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +19,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private security: SecurityService,
+    private notifications: NotificationsService,
   ) {}
 
   async register(username: string, password: string) {
@@ -43,15 +47,47 @@ export class AuthService {
     password: string,
     meta?: { deviceInfo?: string; userAgent?: string; ipAddress?: string },
   ) {
+    const ipAddress = meta?.ipAddress || '';
+    if (ipAddress && this.security.isIpBlocked(ipAddress)) {
+      throw new HttpException('Too many failed login attempts. Try again later.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const normalizedUsername = username?.trim();
     if (!normalizedUsername || !password) {
       throw new BadRequestException('Username and password required');
     }
     const user = await this.prisma.user.findUnique({ where: { username: normalizedUsername } });
-    if (!user) throw new UnauthorizedException();
+
+    if (!user) {
+      if (ipAddress) {
+        const { blocked, justBlocked } = this.security.recordFailedLoginAttempt(ipAddress);
+        if (justBlocked) {
+          await this.notifySecurityTeam(ipAddress);
+        }
+      }
+      throw new UnauthorizedException('Authentication failed');
+    }
 
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok) throw new UnauthorizedException();
+    if (!ok) {
+      if (ipAddress) {
+        const { blocked, justBlocked } = this.security.recordFailedLoginAttempt(ipAddress);
+        await this.security.logActivity(user.id, {
+          action: 'login_failure',
+          at: new Date(),
+          ipAddress,
+          deviceInfo: meta?.deviceInfo,
+        });
+        if (justBlocked) {
+          await this.notifySecurityTeam(ipAddress);
+        }
+      }
+      throw new UnauthorizedException('Authentication failed');
+    }
+
+    if (ipAddress) {
+      this.security.clearFailedLoginAttempts(ipAddress);
+    }
 
     const role = await this.security.resolveRole(user.id, user.username);
     const { session, refreshToken } = await this.security.createSession({
@@ -206,6 +242,14 @@ export class AuthService {
   async setRole(userId: string, role: AppRole) {
     await this.security.setRole(userId, role);
     return { success: true, userId, role };
+  }
+
+  private async notifySecurityTeam(ipAddress: string) {
+    const userIds = await this.security.getAdminAndModeratorUserIds();
+    const message = `IP ${ipAddress} blocked for 30 minutes after excessive failed login attempts.`;
+    for (const userId of userIds) {
+      this.notifications.seed(userId, 'security', message);
+    }
   }
 
   private buildAuthResponse(

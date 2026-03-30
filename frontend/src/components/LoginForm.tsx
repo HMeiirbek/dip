@@ -28,10 +28,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
 
       onSuccess(authResponse.accessToken, username);
     } catch (error: any) {
+      const status = error.response?.status;
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        'Authentication failed';
+        status === 401
+          ? 'Authentication failed'
+          : status === 429
+          ? 'Too many login attempts. Please try again later.'
+          : error.response?.data?.message ||
+            error.message ||
+            'Authentication failed';
       onError?.(errorMessage);
     } finally {
       setIsLoading(false);

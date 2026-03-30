@@ -79,14 +79,16 @@ export const UserDrawer: React.FC<{
             <button style={styles.secondaryButton} onClick={() => onNavigate('security')}>Security</button>
             <button style={styles.secondaryButton} onClick={() => onNavigate('calls')}>Calls</button>
             <button style={styles.secondaryButton} onClick={() => onNavigate('risk')}>Risk</button>
-            <button
-              style={(roleLabel === 'admin' || roleLabel === 'moderator') ? styles.secondaryButton : styles.secondaryButtonDisabled}
-              disabled={roleLabel !== 'admin' && roleLabel !== 'moderator'}
-              onClick={() => onNavigate('moderator')}
-              title={roleLabel === 'admin' || roleLabel === 'moderator' ? 'Open moderator tools' : 'No access'}
-            >
-              Moderator
-            </button>
+            {roleLabel !== 'admin' && (
+              <button
+                style={roleLabel === 'moderator' ? styles.secondaryButton : styles.secondaryButtonDisabled}
+                disabled={roleLabel !== 'moderator'}
+                onClick={() => onNavigate('moderator')}
+                title={roleLabel === 'moderator' ? 'Open moderator tools' : 'No access'}
+              >
+                Moderator
+              </button>
+            )}
             <button
               style={roleLabel === 'admin' ? styles.secondaryButton : styles.secondaryButtonDisabled}
               disabled={roleLabel !== 'admin'}

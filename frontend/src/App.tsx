@@ -61,8 +61,14 @@ const getIceServers = (): RTCIceServer[] => {
   return servers;
 };
 
+const getIceTransportPolicy = (): RTCIceTransportPolicy => {
+  const value = `${process.env.REACT_APP_ICE_TRANSPORT_POLICY || 'all'}`.toLowerCase();
+  return value === 'relay' ? 'relay' : 'all';
+};
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('calls');
+  const activeTabRef = useRef<TabKey>('calls');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const currentUserRef = useRef<User | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -83,8 +89,11 @@ export const App: React.FC = () => {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const qualityTimerRef = useRef<number | null>(null);
   const qualityBytesRef = useRef<{ bytes: number; ts: number } | null>(null);
+  const moderationPresenceRefreshTimerRef = useRef<number | null>(null);
+  const moderationPresenceListenerRef = useRef<((data: { onlineCount: number; at: string }) => void) | null>(null);
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const [incomingOfferReady, setIncomingOfferReady] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
@@ -96,10 +105,19 @@ export const App: React.FC = () => {
     [currentUser],
   );
   const isAdmin = useMemo(() => currentUser?.role === 'admin', [currentUser]);
+  const isModeratorLikeRef = useRef(false);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    isModeratorLikeRef.current = isModeratorLike;
+  }, [isModeratorLike]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -133,6 +151,11 @@ export const App: React.FC = () => {
     notifyError: setErrorMessage,
   });
   const { security, risk, admin, moderator } = controlCenter;
+  const loadModeratorPresenceRef = useRef(moderator.loadModeratorPresence);
+
+  useEffect(() => {
+    loadModeratorPresenceRef.current = moderator.loadModeratorPresence;
+  }, [moderator.loadModeratorPresence]);
 
   const getUserDetails = async (userId: string): Promise<User | null> => {
     try {
@@ -190,6 +213,12 @@ export const App: React.FC = () => {
     return () => {
       socketService.disconnect();
       stopQualityReporter();
+      if (moderationPresenceRefreshTimerRef.current !== null) {
+        window.clearTimeout(moderationPresenceRefreshTimerRef.current);
+      }
+      if (moderationPresenceListenerRef.current) {
+        socketService.offPresenceChanged(moderationPresenceListenerRef.current);
+      }
     };
   }, []);
 
@@ -202,22 +231,44 @@ export const App: React.FC = () => {
       risk.loadRiskData();
     }
     if (activeTab === 'moderator') {
-      moderator.loadModeratorData();
+      moderator.loadModeratorOverview();
     }
     if (activeTab === 'admin') {
       admin.loadAdminData();
+      moderator.loadModeratorOverview();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser, isAdmin, isModeratorLike]);
 
   useEffect(() => {
-    if (!currentUser || !isModeratorLike || activeTab !== 'moderator') return;
+    if (!currentUser || !isModeratorLike || (activeTab !== 'moderator' && activeTab !== 'admin')) return;
     const id = window.setInterval(() => {
-      moderator.loadModeratorData();
-    }, 5000);
+      moderator.loadModeratorOverview({ silent: true });
+    }, 15000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentUser?.id, isModeratorLike]);
+
+  useEffect(() => {
+    if (!currentUser || !isModeratorLike || (activeTab !== 'moderator' && activeTab !== 'admin')) return;
+    moderator.loadModeratorPresence();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentUser?.id, isModeratorLike]);
+
+  useEffect(() => {
+    if (!currentUser || !isModeratorLike || activeTab !== 'moderator') return;
+    moderator.loadModeratorFlags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTab,
+    currentUser?.id,
+    isModeratorLike,
+    moderator.callFlagsStatus,
+    moderator.callFlagsOffset,
+    moderator.callFlagsQuery,
+    moderator.callFlagsSortBy,
+    moderator.callFlagsSortDir,
+  ]);
 
   useEffect(() => {
     if (!currentUser || !isAdmin || activeTab !== 'admin') return;
@@ -233,21 +284,54 @@ export const App: React.FC = () => {
       setActiveTab(isModeratorLike ? 'moderator' : 'calls');
       return;
     }
+    if (activeTab === 'moderator' && isAdmin) {
+      setActiveTab('admin');
+      return;
+    }
     if (activeTab === 'moderator' && !isModeratorLike) {
       setActiveTab('calls');
     }
   }, [activeTab, isAdmin, isModeratorLike]);
 
-  const setupWebRTC = async (call: Call, localUserId: string) => {
+  const setupWebRTC = async (
+    call: Call,
+    localUserId: string,
+    options?: { allowReceiveOnlyFallback?: boolean },
+  ) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setLocalStream(stream);
+      let stream: MediaStream | null = null;
+      let receiveOnly = false;
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('MediaDevices API unavailable.');
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setLocalStream(stream);
+      } catch (mediaError) {
+        if (!options?.allowReceiveOnlyFallback) {
+          throw mediaError;
+        }
+        receiveOnly = true;
+        setLocalStream(null);
+        setMessage(
+          window.isSecureContext
+            ? 'Microphone unavailable. Joining in listen-only mode.'
+            : 'Microphone access is blocked on insecure HTTP. Joining in listen-only mode.',
+        );
+      }
 
       const pc = new RTCPeerConnection({
         iceServers: getIceServers(),
+        iceTransportPolicy: getIceTransportPolicy(),
+        iceCandidatePoolSize: 4,
       });
 
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      if (stream) {
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
+      } else if (receiveOnly) {
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
 
       pc.ontrack = (event) => {
         setRemoteStream(event.streams[0]);
@@ -312,6 +396,7 @@ export const App: React.FC = () => {
     setRemoteStream(null);
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
+    setIncomingOfferReady(false);
   };
 
   const collectQualitySample = async (pc: RTCPeerConnection) => {
@@ -381,9 +466,13 @@ export const App: React.FC = () => {
     }, 5000);
   };
 
-  const handleIncomingCall = async (data: { id: string; from: string; to?: string }) => {
-    const caller = await getUserDetails(data.from);
-    if (caller) setRemoteUsername(caller.username);
+  const handleIncomingCall = async (data: { id: string; from: string; to?: string; callerName?: string }) => {
+    if (data.callerName) {
+      setRemoteUsername(data.callerName);
+    } else {
+      const caller = await getUserDetails(data.from);
+      if (caller) setRemoteUsername(caller.username);
+    }
 
     const callObj: Call = {
       id: data.id,
@@ -394,6 +483,7 @@ export const App: React.FC = () => {
     };
     setIncomingCall(callObj);
     setCallStatus('incoming');
+    setActiveTab('calls');
   };
 
   const acceptCall = async () => {
@@ -401,16 +491,22 @@ export const App: React.FC = () => {
 
     try {
       setCallStatus('calling');
-      const pc = await setupWebRTC(incomingCall, currentUser.id);
+      const pc = await setupWebRTC(incomingCall, currentUser.id, {
+        allowReceiveOnlyFallback: true,
+      });
       if (!pc) {
-        await apiService.rejectCall(incomingCall.id);
-        setIncomingCall(null);
-        setCallStatus('error');
+        setCallStatus('incoming');
+        setErrorMessage(
+          window.isSecureContext
+            ? 'Unable to initialize WebRTC audio on this device.'
+            : 'On mobile browsers microphone access requires HTTPS or localhost. Open the app through a secure tunnel.',
+        );
         return;
       }
 
       if (!pendingOfferRef.current) {
-        setCallStatus('error');
+        setMessage('Waiting for call signaling...');
+        setCallStatus('incoming');
         return;
       }
 
@@ -445,6 +541,7 @@ export const App: React.FC = () => {
       };
       setActiveCall(callObj);
       setIncomingCall(null);
+      setIncomingOfferReady(false);
     } catch (e) {
       console.error('Error accepting call:', e);
       stopQualityReporter();
@@ -464,6 +561,7 @@ export const App: React.FC = () => {
     }
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
+    setIncomingOfferReady(false);
     setIncomingCall(null);
     setCallStatus('idle');
   };
@@ -575,17 +673,39 @@ export const App: React.FC = () => {
     socketService.offOffer();
     socketService.offAnswer();
     socketService.offICECandidate();
+    socketService.offIncomingCall();
     socketService.offCallEnded();
+    if (moderationPresenceListenerRef.current) {
+      socketService.offPresenceChanged(moderationPresenceListenerRef.current);
+    }
+
+    socketService.onIncomingCall(async (data: { from: string; callId: string; callerName?: string }) => {
+      if (activeCallRef.current || incomingCallRef.current?.id === data.callId) {
+        return;
+      }
+      setIncomingOfferReady(false);
+      await handleIncomingCall({
+        id: data.callId,
+        from: data.from,
+        callerName: data.callerName,
+      });
+    });
 
     socketService.onOffer(async (data: RTCOfferData) => {
       if (!currentUserRef.current) return;
       pendingOfferRef.current = data.offer;
       pendingIceCandidatesRef.current = [];
+      setIncomingOfferReady(true);
 
       const caller = await getUserDetails(data.from);
       if (caller) setRemoteUsername(caller.username);
 
-      handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
+      if (incomingCallRef.current?.id !== data.callId) {
+        handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
+      } else {
+        setCallStatus('incoming');
+        setActiveTab('calls');
+      }
     });
 
     socketService.onAnswer(async (data: RTCAnswerData) => {
@@ -634,6 +754,17 @@ export const App: React.FC = () => {
       setMessage(`Call ended: ${data.reason || 'remote end'}`);
       window.setTimeout(() => setCallStatus('idle'), 1200);
     });
+
+    moderationPresenceListenerRef.current = () => {
+      if (!isModeratorLikeRef.current || (activeTabRef.current !== 'moderator' && activeTabRef.current !== 'admin')) return;
+      if (moderationPresenceRefreshTimerRef.current !== null) {
+        window.clearTimeout(moderationPresenceRefreshTimerRef.current);
+      }
+      moderationPresenceRefreshTimerRef.current = window.setTimeout(() => {
+        loadModeratorPresenceRef.current();
+      }, 250);
+    };
+    socketService.onPresenceChanged(moderationPresenceListenerRef.current);
   };
 
   const handleLogin = async (token: string, username: string) => {
@@ -700,7 +831,7 @@ export const App: React.FC = () => {
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
-          {isModeratorLike && (
+          {!isAdmin && isModeratorLike && (
             <NavItem active={activeTab === 'moderator'} label="Moderator" onClick={() => setActiveTab('moderator')} />
           )}
           {isAdmin && (
@@ -754,6 +885,7 @@ export const App: React.FC = () => {
               activeCall={activeCall}
               incomingCall={incomingCall}
               remoteUsername={remoteUsername}
+              canAcceptIncoming={incomingOfferReady}
               onAccept={acceptCall}
               onReject={rejectCall}
               onEnd={endCall}
@@ -807,6 +939,7 @@ export const App: React.FC = () => {
               role={currentUser.role}
               loading={moderator.moderatorLoading}
               moderatorOverview={moderator.moderatorOverview}
+              moderatorPresence={moderator.moderatorPresence}
               callFlags={moderator.callFlags}
               callFlagsStatus={moderator.callFlagsStatus}
               setCallFlagsStatus={moderator.setCallFlagsStatus}
@@ -842,6 +975,8 @@ export const App: React.FC = () => {
               adminSessions={admin.adminSessions}
               adminSecurityActivity={admin.adminSecurityActivity}
               adminTrafficLogs={admin.adminTrafficLogs}
+              moderatorPresence={moderator.moderatorPresence}
+              moderatorOverview={moderator.moderatorOverview}
               mlStatus={admin.mlStatus}
               mlMetrics={admin.mlMetrics}
               blacklist={admin.blacklist}
@@ -850,11 +985,18 @@ export const App: React.FC = () => {
               blacklistReason={admin.blacklistReason}
               setBlacklistReason={admin.setBlacklistReason}
               onReloadAdmin={admin.loadAdminData}
+              onReloadLiveOps={async () => {
+                await Promise.all([
+                  moderator.loadModeratorPresence(),
+                  moderator.loadModeratorOverview(),
+                ]);
+              }}
               onReloadMl={admin.handleReloadMl}
               onAddBlacklist={admin.handleAddBlacklist}
               onDeleteBlacklist={admin.deleteBlacklist}
               onUpdateUserRole={admin.updateRole}
               onDeleteUser={admin.deleteUser}
+              onForceEndCall={moderator.forceEndCall}
             />
           )}
         </div>

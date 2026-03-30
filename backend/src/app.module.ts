@@ -15,7 +15,7 @@ import { MlModule } from './ml/ml.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({ envFilePath: ['.env.local', '.env'] }),
     PrismaModule,
     AuthModule,
     UsersModule,

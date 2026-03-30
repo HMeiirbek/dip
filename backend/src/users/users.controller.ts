@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Put, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -37,6 +37,8 @@ export class UsersController {
 
   @ApiOperation({ summary: 'List My Sessions' })
   @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
   @Get('me/sessions')
   async getMySessions(@Req() req: { user: { sub: string } }) {
     return this.users.getSessions(req.user.sub);
@@ -54,6 +56,8 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Get My Security Activity' })
   @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  @Header('Pragma', 'no-cache')
   @Get('me/security-activity')
   async getMySecurityActivity(@Req() req: { user: { sub: string } }) {
     return this.users.getSecurityActivity(req.user.sub);

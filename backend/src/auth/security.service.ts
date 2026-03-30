@@ -16,6 +16,20 @@ type SecurityActivity = {
 export class SecurityService {
   private readonly refreshTtlMs = 1000 * 60 * 60 * 24 * 30;
 
+  private readonly loginBlockThreshold = 5;
+  private readonly loginBlockWindowMs = 30 * 60 * 1000;
+  private readonly loginBlockDurationMs = 30 * 60 * 1000;
+
+  private readonly failedLoginState = new Map<
+    string,
+    {
+      count: number;
+      firstAttemptAt: number;
+      blockedUntil?: number;
+      notified: boolean;
+    }
+  >();
+
   private readonly adminUsernames = new Set(
     (process.env.ADMIN_USERNAMES || '')
       .split(',')
@@ -63,6 +77,64 @@ export class SecurityService {
       userId,
       role,
     );
+  }
+
+  isIpBlocked(ipAddress: string): boolean {
+    const state = this.failedLoginState.get(ipAddress);
+    if (!state || !state.blockedUntil) return false;
+    if (state.blockedUntil > Date.now()) return true;
+    this.failedLoginState.delete(ipAddress);
+    return false;
+  }
+
+  recordFailedLoginAttempt(ipAddress: string) {
+    const now = Date.now();
+    const state = this.failedLoginState.get(ipAddress) ?? {
+      count: 0,
+      firstAttemptAt: now,
+      notified: false,
+    };
+
+    if (state.blockedUntil && state.blockedUntil > now) {
+      this.failedLoginState.set(ipAddress, state);
+      return { blocked: true, justBlocked: false };
+    }
+
+    if (now - state.firstAttemptAt > this.loginBlockWindowMs) {
+      state.count = 0;
+      state.firstAttemptAt = now;
+      state.blockedUntil = undefined;
+      state.notified = false;
+    }
+
+    state.count += 1;
+    let justBlocked = false;
+    if (state.count >= this.loginBlockThreshold) {
+      state.blockedUntil = now + this.loginBlockDurationMs;
+      justBlocked = !state.notified;
+      state.notified = true;
+    }
+
+    this.failedLoginState.set(ipAddress, state);
+    return { blocked: !!state.blockedUntil && state.blockedUntil > now, justBlocked };
+  }
+
+  clearFailedLoginAttempts(ipAddress: string) {
+    this.failedLoginState.delete(ipAddress);
+  }
+
+  async getAdminAndModeratorUserIds() {
+    const usernames = [...this.adminUsernames, ...this.moderatorUsernames];
+    const orClause: any[] = [{ role: { in: ['admin', 'moderator'] } }];
+    if (usernames.length > 0) {
+      orClause.push({ username: { in: usernames } });
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { OR: orClause },
+      select: { id: true },
+    });
+    return Array.from(new Set(users.map((user) => user.id)));
   }
 
   async isVerified(userId: string) {
@@ -280,6 +352,8 @@ export class SecurityService {
       `SELECT id, role, device_info, ip_address, user_agent, created_at, last_seen_at, expires_at, revoked_at
        FROM security_sessions
        WHERE user_id = $1
+         AND revoked_at IS NULL
+         AND expires_at > NOW()
        ORDER BY created_at DESC
        LIMIT 500`,
       userId,

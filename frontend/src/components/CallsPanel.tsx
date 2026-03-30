@@ -12,6 +12,7 @@ interface CallsPanelProps {
   activeCall: Call | null;
   incomingCall: Call | null;
   remoteUsername: string | null;
+  canAcceptIncoming: boolean;
   onAccept: () => Promise<void> | void;
   onReject: () => Promise<void> | void;
   onEnd: () => Promise<void> | void;
@@ -27,6 +28,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   activeCall,
   incomingCall,
   remoteUsername,
+  canAcceptIncoming,
   onAccept,
   onReject,
   onEnd,
@@ -51,6 +53,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
             activeCall={activeCall}
             incomingCall={incomingCall}
             remoteUsername={remoteUsername}
+            canAccept={canAcceptIncoming}
             onAccept={onAccept}
             onReject={onReject}
             onEnd={onEnd}

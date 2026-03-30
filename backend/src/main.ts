@@ -7,13 +7,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.setGlobalPrefix('api/v1');
-  const corsOrigins = (process.env.CORS_ORIGIN || '*')
+  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001')
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean);
   app.enableCors({
-    origin: corsOrigins.length === 1 && corsOrigins[0] === '*' ? true : corsOrigins,
+    origin: corsOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   const swaggerConfig = new DocumentBuilder()

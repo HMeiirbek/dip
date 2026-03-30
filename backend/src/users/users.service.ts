@@ -1,12 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { WsPresenceService } from '../ws/ws-presence.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private prisma: PrismaService,
     private auth: AuthService,
+    private presence: WsPresenceService,
   ) {}
 
   async findById(id: string) {
@@ -23,13 +25,19 @@ export class UsersService {
   }
 
   async findAll() {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       select: {
         id: true,
         username: true,
         createdAt: true,
       },
     });
+
+    const onlineSet = new Set(this.presence.getOnlineUserIds());
+    return users.map((user) => ({
+      ...user,
+      online: onlineSet.has(user.id),
+    }));
   }
 
   async updateMe(userId: string, data: { username?: string }) {

@@ -14,6 +14,8 @@ import {
   BlacklistEntry,
   MlMetrics,
   MlStatus,
+  ModeratorOverview,
+  ModeratorPresenceSnapshot,
 } from '../types';
 
 type Props = {
@@ -29,6 +31,8 @@ type Props = {
   adminSessions: AdminManagedSession[];
   adminSecurityActivity: AdminSecurityEvent[];
   adminTrafficLogs: AdminTrafficLog[];
+  moderatorPresence: ModeratorPresenceSnapshot | null;
+  moderatorOverview: ModeratorOverview | null;
   mlStatus: MlStatus | null;
   mlMetrics: MlMetrics | null;
   blacklist: BlacklistEntry[];
@@ -37,11 +41,13 @@ type Props = {
   blacklistReason: string;
   setBlacklistReason: React.Dispatch<React.SetStateAction<string>>;
   onReloadAdmin: () => Promise<void> | void;
+  onReloadLiveOps: () => Promise<void> | void;
   onReloadMl: () => Promise<void> | void;
   onAddBlacklist: () => Promise<void> | void;
   onDeleteBlacklist: (id: string) => Promise<void> | void;
   onUpdateUserRole: (id: string, role: 'user' | 'admin' | 'moderator') => Promise<void> | void;
   onDeleteUser: (id: string) => Promise<void> | void;
+  onForceEndCall: (id: string) => Promise<void> | void;
 };
 
 export const AdminPage: React.FC<Props> = ({
@@ -57,6 +63,8 @@ export const AdminPage: React.FC<Props> = ({
   adminSessions,
   adminSecurityActivity,
   adminTrafficLogs,
+  moderatorPresence,
+  moderatorOverview,
   mlStatus,
   mlMetrics,
   blacklist,
@@ -65,11 +73,13 @@ export const AdminPage: React.FC<Props> = ({
   blacklistReason,
   setBlacklistReason,
   onReloadAdmin,
+  onReloadLiveOps,
   onReloadMl,
   onAddBlacklist,
   onDeleteBlacklist,
   onUpdateUserRole,
   onDeleteUser,
+  onForceEndCall,
 }) => {
   const [userQuery, setUserQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -169,10 +179,106 @@ export const AdminPage: React.FC<Props> = ({
       <div style={styles.summaryGrid}>
         <SummaryCard label="Users" value={String(adminDashboard?.users ?? adminUsers.length)} hint={`online ${adminUsers.filter((user) => user.online).length}`} />
         <SummaryCard label="Calls" value={String(adminDashboard?.totalCalls ?? 0)} hint={`ongoing ${adminDashboard?.ongoingCalls ?? 0}`} />
+        <SummaryCard label="Live online" value={String(moderatorPresence?.onlineCount ?? 0)} hint="socket presence" />
+        <SummaryCard label="Live calls" value={String(moderatorOverview?.callCount ?? 0)} hint={`alerts ${moderatorOverview?.qualitySummary?.alerts?.length || 0}`} />
         <SummaryCard label="Reports" value={String(adminReports?.total ?? adminDashboard?.reports ?? 0)} hint={`blacklist ${blacklist.length}`} />
         <SummaryCard label="SLA setup p95" value={formatMetric(adminSlaSummary?.callSetup.p95Sec, 's')} hint={`<=8s target`} />
         <SummaryCard label="RTT ok 24h" value={formatMetric(adminSlaSummary?.quality24h.rttLe200Pct, '%')} hint={`samples ${adminSlaSummary?.quality24h.samples ?? 0}`} />
         <SummaryCard label="ML" value={mlStatus?.active ? (mlStatus.model?.version || 'active') : 'inactive'} hint={`acc ${formatMetric(mlMetrics?.accuracy, '%')}`} />
+      </div>
+
+      <div style={styles.gridSecondary}>
+        <section style={styles.card}>
+          <div style={styles.cardHeaderRow}>
+            <h3 style={styles.cardTitle}>Live presence</h3>
+            <button style={styles.smallButton} onClick={onReloadLiveOps}>Refresh live ops</button>
+          </div>
+          <div style={styles.tableWrapShort}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>IP</th>
+                  <th>Device</th>
+                  <th>Connected</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(moderatorPresence?.onlineUsers || []).map((user) => (
+                  <tr key={user.userId}>
+                    <td>{user.username}</td>
+                    <td>{user.role}</td>
+                    <td>{user.ipAddress}</td>
+                    <td>{user.deviceInfo}</td>
+                    <td>{new Date(user.connectedAt).toLocaleTimeString()}</td>
+                  </tr>
+                ))}
+                {!moderatorPresence?.onlineUsers?.length && (
+                  <tr>
+                    <td colSpan={5}>No online users</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section style={styles.card}>
+          <div style={styles.cardHeaderRow}>
+            <h3 style={styles.cardTitle}>Live calls and quality</h3>
+            <span style={styles.subtleSmall}>{moderatorOverview?.qualitySummary?.alerts?.length || 0} alerts</span>
+          </div>
+          <div style={styles.tableWrapShort}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Caller</th>
+                  <th>Callee</th>
+                  <th>Metrics</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(moderatorOverview?.calls || []).map((call) => (
+                  <tr key={call.id}>
+                    <td>{call.status}</td>
+                    <td>{formatDuration(call.durationSec)}</td>
+                    <td>{call.caller.username}</td>
+                    <td>{call.callee.username}</td>
+                    <td>
+                      RTT {formatMetric(call.quality?.rttMs, 'ms')}<br />
+                      J {formatMetric(call.quality?.jitterMs, 'ms')}<br />
+                      L {formatMetric(call.quality?.packetLossPct, '%')}
+                    </td>
+                    <td>
+                      <button style={styles.smallDanger} onClick={() => onForceEndCall(call.id)}>
+                        Force End
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!moderatorOverview?.calls?.length && (
+                  <tr>
+                    <td colSpan={6}>No live calls</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={styles.listBoxCompact}>
+            {(moderatorOverview?.qualitySummary?.alerts || []).slice(0, 12).map((alert, idx) => (
+              <div key={`${alert.callId}-${alert.metric}-${idx}`} style={styles.listRowColumn}>
+                <strong>{alert.level.toUpperCase()} | {alert.metric}</strong>
+                <small>{alert.message}</small>
+              </div>
+            ))}
+            {!moderatorOverview?.qualitySummary?.alerts?.length && <small>No live quality alerts</small>}
+          </div>
+        </section>
       </div>
 
       <div style={styles.gridMain}>
@@ -570,6 +676,13 @@ const MetricTile: React.FC<{ label: string; value: string }> = ({ label, value }
 function formatMetric(value: number | null | undefined, suffix: string) {
   if (typeof value !== 'number' || Number.isNaN(value)) return '-';
   return `${value.toFixed(2)}${suffix}`;
+}
+
+function formatDuration(totalSec?: number) {
+  const value = Math.max(0, totalSec || 0);
+  const min = Math.floor(value / 60);
+  const sec = value % 60;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 const styles: Record<string, React.CSSProperties> = {

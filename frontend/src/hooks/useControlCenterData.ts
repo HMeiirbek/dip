@@ -15,6 +15,7 @@ import {
   MlStatus,
   ModeratorCallFlag,
   ModeratorOverview,
+  ModeratorPresenceSnapshot,
   NumberCheckResult,
   RiskAnalysis,
   RiskMonitor,
@@ -68,6 +69,7 @@ export function useControlCenterData(params: {
   const [blacklistReason, setBlacklistReason] = useState('');
   const [moderatorLoading, setModeratorLoading] = useState(false);
   const [moderatorOverview, setModeratorOverview] = useState<ModeratorOverview | null>(null);
+  const [moderatorPresence, setModeratorPresence] = useState<ModeratorPresenceSnapshot | null>(null);
   const [callFlags, setCallFlags] = useState<ModeratorCallFlag[]>([]);
   const [callFlagsStatus, setCallFlagsStatus] = useState<'open' | 'resolved' | 'all'>('open');
   const [callFlagsQuery, setCallFlagsQuery] = useState('');
@@ -110,12 +112,54 @@ export function useControlCenterData(params: {
     }
   };
 
+  const loadModeratorOverview = async (options?: { silent?: boolean }) => {
+    if (!isModeratorLike) return;
+    if (!options?.silent) setModeratorLoading(true);
+    try {
+      const modOverview = await apiService.getModeratorOverview();
+      setModeratorOverview(modOverview || null);
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
+    } finally {
+      if (!options?.silent) setModeratorLoading(false);
+    }
+  };
+
+  const loadModeratorPresence = async () => {
+    if (!isModeratorLike) return;
+    try {
+      const presence = await apiService.getModeratorPresence();
+      setModeratorPresence(presence || null);
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
+    }
+  };
+
+  const loadModeratorFlags = async () => {
+    if (!isModeratorLike) return;
+    try {
+      const flagsPage = await apiService.getAdminCallFlags(
+        callFlagsStatus,
+        callFlagsLimit,
+        callFlagsOffset,
+        callFlagsQuery,
+        callFlagsSortBy,
+        callFlagsSortDir,
+      );
+      setCallFlags(flagsPage?.items || []);
+      setCallFlagsTotal(flagsPage?.total || 0);
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
+    }
+  };
+
   const loadModeratorData = async () => {
     if (!isModeratorLike) return;
     setModeratorLoading(true);
     try {
-      const [modOverview, flagsPage] = await Promise.all([
+      const [modOverview, presence, flagsPage] = await Promise.all([
         apiService.getModeratorOverview(),
+        apiService.getModeratorPresence(),
         apiService.getAdminCallFlags(
           callFlagsStatus,
           callFlagsLimit,
@@ -126,6 +170,7 @@ export function useControlCenterData(params: {
         ),
       ]);
       setModeratorOverview(modOverview || null);
+      setModeratorPresence(presence || null);
       setCallFlags(flagsPage?.items || []);
       setCallFlagsTotal(flagsPage?.total || 0);
     } catch (e) {
@@ -259,7 +304,11 @@ export function useControlCenterData(params: {
   };
 
   const terminateSession = async (id: string) => {
-    await apiService.terminateSession(id);
+    const result = await apiService.terminateSession(id);
+    setSecuritySessions((prev) => prev.filter((session) => session.id !== id));
+    if (result?.revoked) {
+      notify('Session terminated');
+    }
     await loadSecurityData();
   };
 
@@ -344,6 +393,7 @@ export function useControlCenterData(params: {
     },
     moderator: {
       moderatorOverview,
+      moderatorPresence,
       moderatorLoading,
       callFlags,
       callFlagsStatus,
@@ -358,6 +408,9 @@ export function useControlCenterData(params: {
       setCallFlagsSortBy,
       callFlagsSortDir,
       setCallFlagsSortDir,
+      loadModeratorOverview,
+      loadModeratorPresence,
+      loadModeratorFlags,
       loadModeratorData,
       forceEndCall,
       flagCall,

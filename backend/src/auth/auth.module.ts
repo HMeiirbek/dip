@@ -5,9 +5,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { SecurityService } from './security.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
+    NotificationsModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'secret',

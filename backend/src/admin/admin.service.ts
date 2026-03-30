@@ -21,6 +21,79 @@ export class AdminService {
     private presence: WsPresenceService,
   ) {}
 
+  async moderationPresence() {
+    const snapshot = this.presence.getPresenceSnapshot();
+    const onlineIds = snapshot.map((entry) => entry.userId);
+
+    const [users, roles, sessionRows] = await Promise.all([
+      onlineIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: onlineIds } },
+            select: { id: true, username: true },
+          })
+        : Promise.resolve([]),
+      onlineIds.length
+        ? this.prisma.$queryRawUnsafe<Array<{ user_id: string; role: string }>>(
+            `SELECT user_id, role FROM security_user_state WHERE user_id = ANY($1::text[])`,
+            onlineIds,
+          )
+        : Promise.resolve([]),
+      onlineIds.length
+        ? this.prisma.$queryRawUnsafe<
+            Array<{
+              user_id: string;
+              ip_address: string | null;
+              device_info: string | null;
+              user_agent: string | null;
+              last_seen_at: Date;
+              expires_at: Date;
+              revoked_at: Date | null;
+            }>
+          >(
+            `SELECT DISTINCT ON (user_id)
+              user_id, ip_address, device_info, user_agent, last_seen_at, expires_at, revoked_at
+             FROM security_sessions
+             WHERE user_id = ANY($1::text[])
+             ORDER BY user_id, last_seen_at DESC`,
+            onlineIds,
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const usersById = new Map(users.map((user) => [user.id, user]));
+    const rolesById = new Map(roles.map((row) => [row.user_id, row.role]));
+    const sessionById = new Map(sessionRows.map((row) => [row.user_id, row]));
+
+    const onlineUsers = snapshot
+      .map((entry) => {
+        const user = usersById.get(entry.userId);
+        const session = sessionById.get(entry.userId);
+        return {
+          userId: entry.userId,
+          username: user?.username || 'unknown',
+          role: rolesById.get(entry.userId) || 'user',
+          socketId: entry.socketId,
+          connectedAt: entry.connectedAt,
+          ipAddress: session?.ip_address || 'unknown',
+          deviceInfo: session?.device_info || 'unknown',
+          userAgent: session?.user_agent || 'unknown',
+          lastSeenAt: session?.last_seen_at || null,
+          sessionActive: Boolean(
+            session &&
+              !session.revoked_at &&
+              new Date(session.expires_at).getTime() > Date.now(),
+          ),
+        };
+      })
+      .sort((a, b) => a.username.localeCompare(b.username));
+
+    return {
+      generatedAt: new Date(),
+      onlineCount: onlineUsers.length,
+      onlineUsers,
+    };
+  }
+
   async dashboard() {
     const [users, totalCalls, ongoingCalls, endedCalls] = await Promise.all([
       this.prisma.user.count(),
@@ -571,22 +644,10 @@ export class AdminService {
   }
 
   async moderationOverview() {
-    const snapshot = this.presence.getPresenceSnapshot();
-    const onlineIds = snapshot.map((entry) => entry.userId);
+    const presence = await this.moderationPresence();
+    const onlineIds = presence.onlineUsers.map((entry) => entry.userId);
 
-    const [users, roles, sessionRows, activeCalls] = await Promise.all([
-      onlineIds.length
-        ? this.prisma.user.findMany({
-            where: { id: { in: onlineIds } },
-            select: { id: true, username: true },
-          })
-        : Promise.resolve([]),
-      onlineIds.length
-        ? this.prisma.$queryRawUnsafe<Array<{ user_id: string; role: string }>>(
-            `SELECT user_id, role FROM security_user_state WHERE user_id = ANY($1::text[])`,
-            onlineIds,
-          )
-        : Promise.resolve([]),
+    const [sessionRows, activeCalls] = await Promise.all([
       onlineIds.length
         ? this.prisma.$queryRawUnsafe<
             Array<{
@@ -664,8 +725,6 @@ export class AdminService {
         )
       : [];
 
-    const usersById = new Map(users.map((user) => [user.id, user]));
-    const rolesById = new Map(roles.map((row) => [row.user_id, row.role]));
     const sessionById = new Map(sessionRows.map((row) => [row.user_id, row]));
     const qualityByCallId = new Map(qualityRows.map((row) => [row.call_id, row]));
     const trendRowsByCallId = new Map<
@@ -703,29 +762,6 @@ export class AdminService {
       });
     }
     const onlineSet = new Set(onlineIds);
-
-    const onlineUsers = snapshot
-      .map((entry) => {
-        const user = usersById.get(entry.userId);
-        const session = sessionById.get(entry.userId);
-        return {
-          userId: entry.userId,
-          username: user?.username || 'unknown',
-          role: rolesById.get(entry.userId) || 'user',
-          socketId: entry.socketId,
-          connectedAt: entry.connectedAt,
-          ipAddress: session?.ip_address || 'unknown',
-          deviceInfo: session?.device_info || 'unknown',
-          userAgent: session?.user_agent || 'unknown',
-          lastSeenAt: session?.last_seen_at || null,
-          sessionActive: Boolean(
-            session &&
-              !session.revoked_at &&
-              new Date(session.expires_at).getTime() > Date.now(),
-          ),
-        };
-      })
-      .sort((a, b) => a.username.localeCompare(b.username));
 
     const calls = activeCalls.map((call) => {
       const started = call.startedAt || call.createdAt;
@@ -893,8 +929,8 @@ export class AdminService {
 
     return {
       generatedAt: new Date(),
-      onlineCount: onlineUsers.length,
-      onlineUsers,
+      onlineCount: presence.onlineCount,
+      onlineUsers: presence.onlineUsers,
       callCount: calls.length,
       calls,
       qualitySummary: {

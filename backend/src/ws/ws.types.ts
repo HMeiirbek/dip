@@ -52,7 +52,7 @@ export interface WebSocketIncomingEvents {
  * Outgoing WebSocket events (to client)
  */
 export interface WebSocketOutgoingEvents {
-  'users:online': (data: { userIds: string[] }) => void;
+  'moderation:presence-changed': (data: { onlineCount: number; at: string }) => void;
   'call:incoming': (data: {
     callId: string;
     callerId: string;

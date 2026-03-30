@@ -28,14 +28,14 @@ class SocketService {
           auth: {
             token,
           },
+          autoConnect: false,
           reconnection: true,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          randomizationFactor: 0.3,
-          // 1s -> 2s -> up to 5s (+ randomizationFactor jitter)
-          reconnectionAttempts: 20,
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
+          randomizationFactor: 0.5,
+          reconnectionAttempts: 5,
           timeout: 10000,
-          transports: ['websocket', 'polling'],
+          transports: ['websocket'],
         });
 
         this.socket.on('connect', () => {
@@ -45,8 +45,13 @@ class SocketService {
 
         this.socket.on('connect_error', (error) => {
           console.error('❌ Socket connection error:', error);
+          if (this.socket) {
+            this.socket.disconnect();
+          }
           reject(error);
         });
+
+        this.socket.connect();
       } catch (error) {
         reject(error);
       }
@@ -55,6 +60,7 @@ class SocketService {
 
   disconnect(): void {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
     }
@@ -129,14 +135,29 @@ class SocketService {
   }
 
   // Call notification events
-  onIncomingCall(callback: (data: { from: string; callId: string }) => void): void {
+  onIncomingCall(callback: (data: { from: string; callId: string; callerName?: string }) => void): void {
     if (!this.socket) return;
-    this.socket.on('call:incoming', callback);
+    this.socket.on('call:incoming', (payload: any) => {
+      callback({
+        from: payload.callerId ?? payload.from,
+        callId: payload.callId,
+        callerName: payload.callerName,
+      });
+    });
   }
 
   onCallEnded(callback: (data: { callId: string }) => void): void {
     if (!this.socket) return;
     this.socket.on('call:ended', callback);
+  }
+
+  onModerationPresenceChanged(callback: (data: { onlineCount: number; at: string }) => void): void {
+    if (!this.socket) return;
+    this.socket.on('moderation:presence-changed', callback);
+  }
+
+  onPresenceChanged(callback: (data: { onlineCount: number; at: string }) => void): void {
+    this.onModerationPresenceChanged(callback);
   }
 
   // Remove listeners
@@ -163,6 +184,19 @@ class SocketService {
   offCallEnded(): void {
     if (!this.socket) return;
     this.socket.off('call:ended');
+  }
+
+  offModerationPresenceChanged(callback?: (data: { onlineCount: number; at: string }) => void): void {
+    if (!this.socket) return;
+    if (callback) {
+      this.socket.off('moderation:presence-changed', callback);
+      return;
+    }
+    this.socket.off('moderation:presence-changed');
+  }
+
+  offPresenceChanged(callback?: (data: { onlineCount: number; at: string }) => void): void {
+    this.offModerationPresenceChanged(callback);
   }
 }
 

@@ -39,6 +39,7 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   onResetPassword,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
+  const activeSessions = securitySessions.filter((session) => session.active);
   return (
     <div style={{ ...styles.grid2, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
       <div style={styles.card}>
@@ -57,9 +58,9 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
           <button style={styles.primaryButton} onClick={onVerify}>Verify</button>
         </div>
 
-        <h4>Sessions ({securitySessions.length})</h4>
+        <h4>Active Sessions ({activeSessions.length})</h4>
         <div style={styles.listBox}>
-          {securitySessions.map((s) => (
+          {activeSessions.map((s) => (
             <div key={s.id} style={styles.listItem}>
               <div>
                 <div>{s.deviceInfo} | {s.ipAddress}</div>
@@ -68,6 +69,7 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
               <button style={styles.smallDanger} onClick={() => onTerminateSession(s.id)}>Terminate</button>
             </div>
           ))}
+          {!activeSessions.length && <div style={styles.emptyState}>No active sessions</div>}
         </div>
       </div>
 
@@ -138,6 +140,7 @@ const styles: Record<string, React.CSSProperties> = {
     paddingBottom: 6,
   },
   listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 6 },
+  emptyState: { color: 'var(--muted)', fontSize: 13, padding: '8px 4px' },
   primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontWeight: 800 },
   secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 800 },
   smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--danger)', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 },

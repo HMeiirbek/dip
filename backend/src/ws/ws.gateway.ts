@@ -9,6 +9,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
+
+const wsCorsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
 import { CallsService } from '../calls/calls.service';
 import { JwtService } from '@nestjs/jwt';
 import { CallEventsService } from '../calls/call-events.service';
@@ -32,7 +37,14 @@ interface ICECandidate {
   candidate: RTCIceCandidate;
 }
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({
+  cors: {
+    origin: wsCorsOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  },
+  transports: ['websocket'],
+})
 @Injectable()
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -372,8 +384,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private broadcastOnlineUsers() {
-    const onlineUserIds = this.presence.getOnlineUserIds();
-    this.logger.debug(`Broadcasting online users: ${onlineUserIds.length}`);
-    this.server.emit('users:online', { userIds: onlineUserIds });
+    const onlineCount = this.presence.getOnlineUserIds().length;
+    this.logger.debug(`Broadcasting moderation presence change: ${onlineCount} online`);
+    this.server.emit('moderation:presence-changed', {
+      onlineCount,
+      at: new Date().toISOString(),
+    });
   }
 }

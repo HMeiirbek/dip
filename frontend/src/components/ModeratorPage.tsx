@@ -5,6 +5,7 @@ import {
   ModeratorCallFlag,
   ModeratorOnlineUser,
   ModeratorOverview,
+  ModeratorPresenceSnapshot,
 } from '../types';
 
 type PageProps = {
@@ -12,6 +13,7 @@ type PageProps = {
   role?: string;
   loading: boolean;
   moderatorOverview: ModeratorOverview | null;
+  moderatorPresence: ModeratorPresenceSnapshot | null;
   callFlags: ModeratorCallFlag[];
   callFlagsStatus: 'open' | 'resolved' | 'all';
   setCallFlagsStatus: React.Dispatch<React.SetStateAction<'open' | 'resolved' | 'all'>>;
@@ -37,6 +39,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
   role,
   loading,
   moderatorOverview,
+  moderatorPresence,
   callFlags,
   callFlagsStatus,
   setCallFlagsStatus,
@@ -65,6 +68,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
   const [stableOnlineUsers, setStableOnlineUsers] = useState<ModeratorOnlineUser[]>([]);
   const [changedUserIds, setChangedUserIds] = useState<string[]>([]);
   const pulseTimerRef = useRef<number | null>(null);
+  const changedUserIdSet = useMemo(() => new Set(changedUserIds), [changedUserIds]);
 
   useEffect(() => {
     const firstCallId = moderatorOverview?.calls?.[0]?.id || null;
@@ -88,7 +92,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
   }, [flagSearchDraft, callFlagsQuery, setCallFlagsOffset, setCallFlagsQuery]);
 
   useEffect(() => {
-    const nextUsers = sortOnlineUsers(moderatorOverview?.onlineUsers || []);
+    const nextUsers = sortOnlineUsers(moderatorPresence?.onlineUsers || []);
     setStableOnlineUsers((prev) => {
       const reconciled = reconcileOnlineUsers(prev, nextUsers);
       if (reconciled.changedIds.length) {
@@ -100,7 +104,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
       }
       return reconciled.changed ? reconciled.users : prev;
     });
-  }, [moderatorOverview?.onlineUsers]);
+  }, [moderatorPresence?.onlineUsers]);
 
   useEffect(() => {
     return () => {
@@ -194,7 +198,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
           <div style={styles.cardHeaderRow}>
             <h3 style={styles.cardTitle}>Online users</h3>
             <span style={styles.subtleSmall}>
-              Updated {moderatorOverview?.generatedAt ? new Date(moderatorOverview.generatedAt).toLocaleTimeString() : '-'}
+              Updated {moderatorPresence?.generatedAt ? new Date(moderatorPresence.generatedAt).toLocaleTimeString() : '-'}
             </span>
           </div>
           <div style={styles.tableWrap}>
@@ -214,7 +218,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
                   <OnlineUserRow
                     key={user.userId}
                     user={user}
-                    changed={changedUserIds.includes(user.userId)}
+                    changed={changedUserIdSet.has(user.userId)}
                   />
                 ))}
                 {!stableOnlineUsers.length && (

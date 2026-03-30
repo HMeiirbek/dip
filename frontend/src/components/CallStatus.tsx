@@ -6,6 +6,7 @@ interface CallStatusProps {
   activeCall: Call | null;
   incomingCall: Call | null;
   remoteUsername: string | null;
+  canAccept?: boolean;
   onAccept?: () => void;
   onReject?: () => void;
   onEnd?: () => void;
@@ -16,6 +17,7 @@ export const CallStatus: React.FC<CallStatusProps> = ({
   activeCall,
   incomingCall,
   remoteUsername,
+  canAccept = true,
   onAccept,
   onReject,
   onEnd,
@@ -33,9 +35,15 @@ export const CallStatus: React.FC<CallStatusProps> = ({
           <div style={styles.buttonGroup}>
             <button
               onClick={onAccept}
-              style={{ ...styles.button, ...styles.acceptButton }}
+              style={{
+                ...styles.button,
+                ...styles.acceptButton,
+                opacity: canAccept ? 1 : 0.6,
+                cursor: canAccept ? 'pointer' : 'not-allowed',
+              }}
+              disabled={!canAccept}
             >
-              ✓ Accept
+              {canAccept ? '✓ Accept' : '… Waiting'}
             </button>
             <button
               onClick={onReject}

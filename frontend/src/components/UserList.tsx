@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from '../types';
 import apiService from '../services/api';
+import socketService from '../services/socket';
 import { CallButton } from './CallButton';
 
 interface UserListProps {
@@ -16,28 +17,63 @@ export const UserList: React.FC<UserListProps> = ({
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-    // Refresh users every 5 seconds
-    const interval = setInterval(loadUsers, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
     try {
-      setLoading(true);
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       const data = await apiService.getUsers();
-      setUsers(data);
+      setUsers((prev) => reconcileUsers(prev, data));
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       setError('Failed to load users');
       console.error('Error loading users:', err);
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+
+    const handlePresenceChange = () => {
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+      refreshTimerRef.current = window.setTimeout(() => {
+        loadUsers({ silent: true });
+      }, 180);
+    };
+
+    socketService.onPresenceChanged(handlePresenceChange);
+
+    return () => {
+      socketService.offPresenceChanged(handlePresenceChange);
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, [loadUsers]);
+
+  const otherUsers = useMemo(
+    () =>
+      users
+        .filter((user) => user.id !== currentUserId && user.online)
+        .sort((a, b) => a.username.localeCompare(b.username)),
+    [users, currentUserId],
+  );
 
   if (loading) {
     return <div style={styles.container}>Loading users...</div>;
@@ -46,43 +82,105 @@ export const UserList: React.FC<UserListProps> = ({
   if (error) {
     return (
       <div style={styles.container}>
+        <div style={styles.headerRow}>
+          <h2 style={styles.title}>Users Online</h2>
+        </div>
         <div style={styles.error}>{error}</div>
-        <button onClick={loadUsers} style={styles.retryButton}>
+        <button onClick={() => loadUsers()} style={styles.retryButton}>
           Retry
         </button>
       </div>
     );
   }
 
-  const otherUsers = users.filter((user) => user.id !== currentUserId);
-
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>Users Online ({otherUsers.length})</h2>
+      <div style={styles.headerRow}>
+        <h2 style={styles.title}>Users Online ({otherUsers.length})</h2>
+        <div style={styles.headerMeta}>{refreshing ? 'Updating…' : 'Live via socket presence'}</div>
+      </div>
 
       {otherUsers.length === 0 ? (
-        <div style={styles.empty}>No other users available</div>
+        <div style={styles.empty}>No other online users right now</div>
       ) : (
         <div style={styles.list}>
           {otherUsers.map((user) => (
-            <div key={user.id} style={styles.userItem}>
-              <div style={styles.userInfo}>
-                <span style={styles.userAvatar}>👤</span>
-                <span style={styles.username}>{user.username}</span>
-              </div>
-              <CallButton
-                userId={user.id}
-                username={user.username}
-                onCall={onCall}
-                isInCall={activeCallId !== null}
-              />
-            </div>
+            <UserRow
+              key={user.id}
+              user={user}
+              onCall={onCall}
+              activeCallId={activeCallId}
+            />
           ))}
         </div>
       )}
     </div>
   );
 };
+
+const UserRow = React.memo(
+  ({
+    user,
+    onCall,
+    activeCallId,
+  }: {
+    user: User;
+    onCall: (userId: string) => Promise<void>;
+    activeCallId: string | null;
+  }) => (
+    <div style={styles.userItem}>
+      <div style={styles.userInfo}>
+        <span style={styles.userAvatar}>👤</span>
+        <div style={styles.userMeta}>
+          <span style={styles.username}>{user.username}</span>
+          <small style={styles.onlineMeta}>online now</small>
+        </div>
+      </div>
+      <CallButton
+        userId={user.id}
+        username={user.username}
+        onCall={onCall}
+        isInCall={activeCallId !== null}
+      />
+    </div>
+  ),
+);
+
+function reconcileUsers(prev: User[], next: User[]) {
+  const prevById = new Map(prev.map((user) => [user.id, user]));
+  let changed = prev.length !== next.length;
+
+  const reconciled = next.map((user) => {
+    const previous = prevById.get(user.id);
+    if (previous && isSameUser(previous, user)) {
+      return previous;
+    }
+    changed = true;
+    return user;
+  });
+
+  if (!changed) {
+    for (let i = 0; i < reconciled.length; i += 1) {
+      if (reconciled[i].id !== prev[i]?.id) {
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return changed ? reconciled : prev;
+}
+
+function isSameUser(a: User, b: User) {
+  return (
+    a.id === b.id &&
+    a.username === b.username &&
+    a.role === b.role &&
+    a.createdAt === b.createdAt &&
+    a.verified === b.verified &&
+    a.online === b.online
+  );
+}
 
 const styles = {
   container: {
@@ -93,11 +191,25 @@ const styles = {
     border: '1px solid var(--border)',
   } as React.CSSProperties,
 
+  headerRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '15px',
+    flexWrap: 'wrap' as const,
+  } as React.CSSProperties,
+
   title: {
     color: 'var(--text)',
-    marginBottom: '15px',
     fontSize: '18px',
     fontWeight: '600',
+    margin: 0,
+  } as React.CSSProperties,
+
+  headerMeta: {
+    color: 'var(--muted)',
+    fontSize: '12px',
   } as React.CSSProperties,
 
   error: {
@@ -147,6 +259,17 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
+  } as React.CSSProperties,
+
+  userMeta: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  } as React.CSSProperties,
+
+  onlineMeta: {
+    color: 'var(--muted)',
+    fontSize: '12px',
   } as React.CSSProperties,
 
   userAvatar: {

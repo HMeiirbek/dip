@@ -121,6 +121,13 @@ export class AdminController {
     return this.admin.moderationOverview();
   }
 
+  @ApiOperation({ summary: 'Moderator Presence Snapshot' })
+  @Roles('admin', 'moderator')
+  @Get('moderation/presence')
+  async moderationPresence() {
+    return this.admin.moderationPresence();
+  }
+
   @ApiOperation({ summary: 'Call Quality History (Admin/Moderator)' })
   @Roles('admin', 'moderator')
   @Get('calls/:id/quality-history')

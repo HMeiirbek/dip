@@ -5,6 +5,7 @@ export interface User {
   role?: 'user' | 'admin' | 'moderator';
   verified?: boolean;
   createdAt?: string;
+  online?: boolean;
 }
 
 export interface AuthResponse {
@@ -382,6 +383,12 @@ export interface ModeratorOverview {
       message: string;
     }>;
   };
+}
+
+export interface ModeratorPresenceSnapshot {
+  generatedAt: string;
+  onlineCount: number;
+  onlineUsers: ModeratorOnlineUser[];
 }
 
 export interface ModeratorCallFlag {

@@ -13,6 +13,7 @@ import {
   AdminSlaSummary,
   AdminTrafficLog,
   AdminUserDetail,
+  ModeratorPresenceSnapshot,
 } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
@@ -150,7 +151,13 @@ class ApiService {
   }
 
   async getSessions(): Promise<any[]> {
-    const response = await this.api.get<any[]>('/users/me/sessions');
+    const response = await this.api.get<any[]>('/users/me/sessions', {
+      params: { _ts: Date.now() },
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
     return response.data;
   }
 
@@ -160,7 +167,13 @@ class ApiService {
   }
 
   async getSecurityActivity(): Promise<any[]> {
-    const response = await this.api.get<any[]>('/users/me/security-activity');
+    const response = await this.api.get<any[]>('/users/me/security-activity', {
+      params: { _ts: Date.now() },
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
     return response.data;
   }
 
@@ -321,6 +334,11 @@ class ApiService {
 
   async getModeratorOverview(): Promise<any> {
     const response = await this.api.get('/admin/moderation/overview');
+    return response.data;
+  }
+
+  async getModeratorPresence(): Promise<ModeratorPresenceSnapshot> {
+    const response = await this.api.get<ModeratorPresenceSnapshot>('/admin/moderation/presence');
     return response.data;
   }
 
