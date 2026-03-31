@@ -34,6 +34,14 @@ class ApiService {
       timeout: 15000,
     });
 
+    this.api.interceptors.request.use((config) => {
+      if (this.token) {
+        config.headers = config.headers || {};
+        (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+      }
+      return config;
+    });
+
     this.token = localStorage.getItem('accessToken');
     this.refreshTokenValue = localStorage.getItem('refreshToken');
     this.setAuthHeader();
