@@ -19,9 +19,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
     try {
       let authResponse;
       if (isRegister) {
-        await apiService.register(username, password);
-        // After registration, log in
-        authResponse = await apiService.login(username, password);
+        try {
+          await apiService.register(username, password);
+          authResponse = await apiService.login(username, password);
+        } catch (error: any) {
+          if (error.response?.status === 409) {
+            // User already exists: fallback to login
+            authResponse = await apiService.login(username, password);
+          } else {
+            throw error;
+          }
+        }
       } else {
         authResponse = await apiService.login(username, password);
       }
