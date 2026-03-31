@@ -29,11 +29,17 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
     try {
       const now = new Date();
       const expiredPending = await this.prisma.call.findMany({
-        where: { status: 'pending', expiresAt: { lte: now } },
+        where: {
+          status: 'pending',
+          expiresAt: { not: null, lte: now },
+        },
       });
 
       const expiredAccepted = await this.prisma.call.findMany({
-        where: { status: 'accepted', expiresAt: { lte: now } },
+        where: {
+          status: 'accepted',
+          expiresAt: { not: null, lte: now },
+        },
       });
 
       for (const c of expiredPending) {
