@@ -40,8 +40,12 @@ class ApiService {
     this.api.interceptors.request.use((config) => {
       const activeToken = this.token || localStorage.getItem('accessToken');
       if (activeToken) {
+        const normalized = activeToken.trim();
         config.headers = config.headers || {};
-        (config.headers as Record<string, string>)['Authorization'] = `Bearer ${activeToken}`;
+        (config.headers as Record<string, string>)['Authorization'] = `Bearer ${normalized}`;
+        console.log('[API] Authorization header set for:', config.url, 'token length:', normalized.length);
+      } else {
+        console.log('[API] No token available for:', config.url);
       }
       return config;
     });
@@ -66,9 +70,11 @@ class ApiService {
 
     this.token = normalizedAccessToken;
     localStorage.setItem('accessToken', normalizedAccessToken);
+    console.log('[API] Access token persisted. Length:', normalizedAccessToken.length);
     if (normalizedRefreshToken) {
       this.refreshTokenValue = normalizedRefreshToken;
       localStorage.setItem('refreshToken', normalizedRefreshToken);
+      console.log('[API] Refresh token persisted. Length:', normalizedRefreshToken.length);
     }
     this.setAuthHeader();
   }
@@ -153,7 +159,9 @@ class ApiService {
     }
     this.token = token;
     this.setAuthHeader();
+    console.log('[API] getMe() called with token length:', token.length);
     const response = await this.api.get<User>('/auth/me');
+    console.log('[API] getMe() success:', response.data);
     return response.data;
   }
 

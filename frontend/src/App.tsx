@@ -195,12 +195,18 @@ export const App: React.FC = () => {
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('accessToken');
-      if (!token) return;
+      if (!token) {
+        console.log('[App] No token in localStorage');
+        return;
+      }
+      console.log('[App] Found token in localStorage, length:', token.length);
       try {
         const user = await apiService.getMe();
+        console.log('[App] getMe() succeeded for user:', user.username);
         setCurrentUser(user);
         await connectSocketWithToken(token);
-      } catch {
+      } catch (e) {
+        console.error('[App] getMe() failed during init:', e);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
       }
@@ -768,13 +774,15 @@ export const App: React.FC = () => {
   };
 
   const handleLogin = async (token: string, username: string) => {
+    console.log('[App] handleLogin called for user:', username, 'token length:', token.length);
     try {
       const user = await apiService.getMe();
+      console.log('[App] handleLogin: getMe() succeeded');
       setCurrentUser(user);
       await connectSocketWithToken(token);
       setMessage(`Logged in as ${user.username}`);
     } catch (e) {
-      console.error('Login follow-up failed for user:', username, e);
+      console.error('[App] handleLogin: getMe() failed for user:', username, e);
       setErrorMessage('Login completed but failed to initialize the session');
     }
   };

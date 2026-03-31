@@ -102,6 +102,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@Req() req: { user: { sub: string } }) {
+    console.log('[Auth] /me requested by user:', req.user.sub);
     return this.auth.getUserById(req.user.sub);
   }
 
