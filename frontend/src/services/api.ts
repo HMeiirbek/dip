@@ -29,8 +29,8 @@ class ApiService {
   private refreshTokenValue: string | null = null;
 
   constructor() {
-    this.token = localStorage.getItem('accessToken');
-    this.refreshTokenValue = localStorage.getItem('refreshToken');
+    this.token = localStorage.getItem('accessToken')?.trim() || null;
+    this.refreshTokenValue = localStorage.getItem('refreshToken')?.trim() || null;
 
     this.api = axios.create({
       baseURL: API_BASE_URL,
@@ -58,14 +58,17 @@ class ApiService {
   }
 
   private persistTokens(accessToken: string, refreshToken?: string) {
-    if (!accessToken) {
+    const normalizedAccessToken = accessToken?.trim();
+    if (!normalizedAccessToken) {
       throw new Error('Auth response did not include an access token');
     }
-    this.token = accessToken;
-    localStorage.setItem('accessToken', accessToken);
-    if (refreshToken) {
-      this.refreshTokenValue = refreshToken;
-      localStorage.setItem('refreshToken', refreshToken);
+    const normalizedRefreshToken = refreshToken?.trim() || null;
+
+    this.token = normalizedAccessToken;
+    localStorage.setItem('accessToken', normalizedAccessToken);
+    if (normalizedRefreshToken) {
+      this.refreshTokenValue = normalizedRefreshToken;
+      localStorage.setItem('refreshToken', normalizedRefreshToken);
     }
     this.setAuthHeader();
   }
@@ -144,15 +147,13 @@ class ApiService {
   }
 
   async getMe(): Promise<User> {
-    const token = this.token || localStorage.getItem('accessToken');
+    const token = (this.token || localStorage.getItem('accessToken'))?.trim();
     if (!token) {
       throw new Error('No access token available for getMe');
     }
-    const response = await this.api.get<User>('/auth/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    this.token = token;
+    this.setAuthHeader();
+    const response = await this.api.get<User>('/auth/me');
     return response.data;
   }
 
