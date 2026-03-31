@@ -16,7 +16,12 @@ import {
   ModeratorPresenceSnapshot,
 } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
+const apiBaseUrlRaw = process.env.REACT_APP_API_URL?.trim();
+const API_BASE_URL = (() => {
+  if (!apiBaseUrlRaw) return '/api/v1';
+  const normalized = apiBaseUrlRaw.replace(/\/+$/, '');
+  return normalized.endsWith('/api/v1') ? normalized : `${normalized}/api/v1`;
+})();
 
 class ApiService {
   private api: AxiosInstance;
