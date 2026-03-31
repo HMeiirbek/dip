@@ -56,6 +56,9 @@ class ApiService {
   }
 
   private persistTokens(accessToken: string, refreshToken?: string) {
+    if (!accessToken) {
+      throw new Error('Auth response did not include an access token');
+    }
     this.token = accessToken;
     localStorage.setItem('accessToken', accessToken);
     if (refreshToken) {
@@ -88,6 +91,9 @@ class ApiService {
       password,
     });
 
+    if (!response.data?.accessToken) {
+      throw new Error('Login response did not include access token');
+    }
     this.persistTokens(response.data.accessToken, response.data.refreshToken);
     return response.data;
   }
