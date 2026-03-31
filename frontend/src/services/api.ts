@@ -35,9 +35,12 @@ class ApiService {
     });
 
     this.api.interceptors.request.use((config) => {
-      if (this.token) {
+      const activeToken = this.token || localStorage.getItem('accessToken');
+      if (activeToken) {
         config.headers = config.headers || {};
-        (config.headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+        (config.headers as Record<string, string>)['Authorization'] = `Bearer ${activeToken}`;
+      } else if (config.url?.endsWith('/auth/me')) {
+        console.warn('apiService: no access token available for /auth/me request');
       }
       return config;
     });
