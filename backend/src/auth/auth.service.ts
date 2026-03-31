@@ -258,6 +258,8 @@ export class AuthService {
     sessionId: string,
     refreshToken: string,
   ) {
+    const secretLength = (process.env.JWT_SECRET || 'secret').length;
+    console.log('[AuthService] Building token for user:', userId, 'using secret length:', secretLength);
     return {
       accessToken: this.jwt.sign({
         sub: userId,

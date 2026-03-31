@@ -5,6 +5,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Log JWT configuration
+  const jwtSecretConfigured = !!process.env.JWT_SECRET;
+  const jwtSecretLength = (process.env.JWT_SECRET || 'secret').length;
+  console.log('=== JWT Configuration ===');
+  console.log('JWT_SECRET configured:', jwtSecretConfigured);
+  console.log('JWT secret length:', jwtSecretLength);
+  if (!jwtSecretConfigured) {
+    console.warn('WARNING: JWT_SECRET environment variable is not set. Using default "secret".');
+  }
+  
   app.useWebSocketAdapter(new IoAdapter(app));
   app.setGlobalPrefix('api/v1');
   const corsOriginEnv = process.env.CORS_ORIGIN?.trim();

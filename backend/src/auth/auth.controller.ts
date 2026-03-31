@@ -8,6 +8,17 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 export class AuthController {
   constructor(private auth: AuthService) {}
 
+  @ApiOperation({ summary: 'Debug: Check JWT config' })
+  @Get('debug/jwt-config')
+  async debugJwtConfig() {
+    const secretLength = (process.env.JWT_SECRET || 'secret').length;
+    return {
+      jwtSecretConfigured: !!process.env.JWT_SECRET,
+      secretLength,
+      message: process.env.JWT_SECRET ? 'JWT_SECRET is configured' : 'Using default secret "secret"',
+    };
+  }
+
   @ApiOperation({ summary: 'Register User' })
   @Post('register')
   async register(

@@ -10,9 +10,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
-    console.log('[JwtAuthGuard] canActivate called. Authorization header present:', !!authHeader);
+    console.log('[JwtAuthGuard] canActivate called');
     if (authHeader) {
-      console.log('[JwtAuthGuard] Auth header detected, length:', authHeader.length);
+      console.log('[JwtAuthGuard] Authorization header present, length:', authHeader.length);
+    } else {
+      console.log('[JwtAuthGuard] WARNING: No Authorization header');
     }
     return super.canActivate(context);
   }
@@ -25,12 +27,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     status?: any,
   ) {
     if (err) {
-      console.error('[JwtAuthGuard] JWT validation error:', err.message);
+      console.error('[JwtAuthGuard] JWT error:', {
+        name: err.name,
+        message: err.message,
+      });
       throw err;
     }
     if (!user) {
-      console.error('[JwtAuthGuard] No user after JWT validation. Info:', info?.message);
-      throw new UnauthorizedException();
+      console.error('[JwtAuthGuard] JWT validation failed', {
+        info: info?.message || info,
+        status,
+      });
+      throw new UnauthorizedException(`Unauthorized: ${info?.message || 'Invalid token'}`);
     }
     console.log('[JwtAuthGuard] User authenticated:', user.sub);
     return user;
