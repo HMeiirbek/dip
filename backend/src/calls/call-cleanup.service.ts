@@ -7,11 +7,21 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
   private logger = new Logger('CallCleanupService');
   private interval?: NodeJS.Timeout;
   private isRunning = false;
+  private isEnabled = true;
   private readonly CHECK_INTERVAL = 5000; // every 5 seconds
 
   constructor(private prisma: PrismaService, private callEvents: CallEventsService) {}
 
   async onModuleInit() {
+    const canRun = await this.canRunCleanup();
+    if (!canRun) {
+      this.isEnabled = false;
+      this.logger.warn(
+        'CallCleanupService disabled: call schema is not ready or required columns are missing.',
+      );
+      return;
+    }
+
     this.interval = setInterval(() => this.cleanupExpired(), this.CHECK_INTERVAL);
     this.logger.log('CallCleanupService started');
   }
@@ -20,8 +30,27 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
     if (this.interval) clearInterval(this.interval);
   }
 
+  private async canRunCleanup(): Promise<boolean> {
+    try {
+      const result = await this.prisma.$queryRawUnsafe<
+        Array<{ exists: boolean }>
+      >(
+        `SELECT COUNT(*) = 5 AS "exists"
+         FROM information_schema.columns
+         WHERE lower(table_name) = 'call'
+           AND lower(column_name) IN ('id', 'callerid', 'calleeid', 'status', 'expiresat')`,
+      );
+      return Boolean(result[0]?.exists);
+    } catch (err) {
+      this.logger.warn(
+        `CallCleanupService disabled because schema check failed: ${err?.message || err}`,
+      );
+      return false;
+    }
+  }
+
   private async cleanupExpired() {
-    if (this.isRunning) {
+    if (!this.isEnabled || this.isRunning) {
       return;
     }
 
@@ -76,7 +105,14 @@ export class CallCleanupService implements OnModuleInit, OnModuleDestroy {
         });
       }
     } catch (err) {
-      this.logger.error(`Error cleaning up expired calls: ${err?.message || err}`);
+      const message = err?.message || err;
+      this.logger.error(`Error cleaning up expired calls: ${message}`);
+      if (typeof message === 'string' && message.includes('Invalid prisma.call.findMany() invocation')) {
+        this.logger.error(
+          'CallCleanupService disabled due to invalid Prisma cleanup query. Check database schema or generated Prisma client.',
+        );
+        this.isEnabled = false;
+      }
     } finally {
       this.isRunning = false;
     }
