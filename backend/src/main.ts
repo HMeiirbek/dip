@@ -7,16 +7,17 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   app.setGlobalPrefix('api/v1');
-  const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001')
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  app.enableCors({
-    origin: corsOrigins,
+  const corsOriginEnv = process.env.CORS_ORIGIN?.trim();
+  const corsOrigins = corsOriginEnv
+    ? corsOriginEnv.split(',').map((v) => v.trim()).filter(Boolean)
+    : ['http://localhost:3000', 'http://localhost:3001'];
+  const corsOptions = {
+    origin: corsOrigins.length === 1 && corsOrigins[0] === '*' ? true : corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  };
+  app.enableCors(corsOptions);
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DIP Backend API')

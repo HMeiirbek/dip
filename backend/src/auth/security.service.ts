@@ -44,7 +44,76 @@ export class SecurityService {
       .filter(Boolean),
   );
 
+  private securityTablesReady?: Promise<void>;
+
   constructor(private prisma: PrismaService) {}
+
+  private async ensureSecurityRuntimeTables() {
+    if (!this.securityTablesReady) {
+      this.securityTablesReady = (async () => {
+        await this.prisma.$executeRawUnsafe(
+          `CREATE TABLE IF NOT EXISTS security_user_state (
+             user_id TEXT PRIMARY KEY,
+             role TEXT NOT NULL DEFAULT 'user',
+             is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+           )`,
+        );
+
+        await this.prisma.$executeRawUnsafe(
+          `CREATE TABLE IF NOT EXISTS security_sessions (
+             id TEXT PRIMARY KEY,
+             user_id TEXT NOT NULL,
+             role TEXT NOT NULL,
+             refresh_token_hash TEXT NOT NULL,
+             device_info TEXT NULL,
+             ip_address TEXT NULL,
+             user_agent TEXT NULL,
+             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+             expires_at TIMESTAMPTZ NOT NULL,
+             last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+             revoked_at TIMESTAMPTZ NULL
+           )`,
+        );
+        await this.prisma.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS idx_security_sessions_user_id
+           ON security_sessions(user_id)`,
+        );
+        await this.prisma.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS idx_security_sessions_refresh_hash
+           ON security_sessions(refresh_token_hash)`,
+        );
+
+        await this.prisma.$executeRawUnsafe(
+          `CREATE TABLE IF NOT EXISTS security_logs (
+             id TEXT PRIMARY KEY,
+             user_id TEXT NOT NULL,
+             ip_address TEXT NULL,
+             device TEXT NULL,
+             action TEXT NOT NULL,
+             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+           )`,
+        );
+
+        await this.prisma.$executeRawUnsafe(
+          `CREATE TABLE IF NOT EXISTS security_codes (
+             id TEXT PRIMARY KEY,
+             user_id TEXT NOT NULL,
+             kind TEXT NOT NULL,
+             code_hash TEXT NOT NULL,
+             expires_at TIMESTAMPTZ NOT NULL,
+             consumed_at TIMESTAMPTZ NULL,
+             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+           )`,
+        );
+        await this.prisma.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS idx_security_codes_user_kind
+           ON security_codes(user_id, kind)`,
+        );
+      })();
+    }
+    await this.securityTablesReady;
+  }
 
   determineRoleByUsername(username: string): AppRole {
     if (this.adminUsernames.has(username)) return 'admin';
@@ -53,6 +122,7 @@ export class SecurityService {
   }
 
   async resolveRole(userId: string, username?: string): Promise<AppRole> {
+    await this.ensureSecurityRuntimeTables();
     const rows = await this.prisma.$queryRawUnsafe<Array<{ role: string }>>(
       `SELECT role FROM security_user_state WHERE user_id = $1 LIMIT 1`,
       userId,
@@ -69,6 +139,7 @@ export class SecurityService {
   }
 
   async setRole(userId: string, role: AppRole) {
+    await this.ensureSecurityRuntimeTables();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO security_user_state (user_id, role, is_verified, updated_at)
        VALUES ($1, $2, FALSE, NOW())
@@ -138,6 +209,7 @@ export class SecurityService {
   }
 
   async isVerified(userId: string) {
+    await this.ensureSecurityRuntimeTables();
     const rows = await this.prisma.$queryRawUnsafe<Array<{ is_verified: boolean }>>(
       `SELECT is_verified FROM security_user_state WHERE user_id = $1 LIMIT 1`,
       userId,
@@ -146,6 +218,7 @@ export class SecurityService {
   }
 
   async setVerified(userId: string) {
+    await this.ensureSecurityRuntimeTables();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO security_user_state (user_id, role, is_verified, updated_at)
        VALUES ($1, 'user', TRUE, NOW())
@@ -186,6 +259,7 @@ export class SecurityService {
     ipAddress?: string;
     userAgent?: string;
   }) {
+    await this.ensureSecurityRuntimeTables();
     const refreshToken = crypto.randomBytes(48).toString('hex');
     const now = new Date();
     const session = {
@@ -401,6 +475,7 @@ export class SecurityService {
   }
 
   async getAllSecurityActivity() {
+    await this.ensureSecurityRuntimeTables();
     const rows = await this.prisma.$queryRawUnsafe<
       Array<{
         user_id: string;
@@ -426,6 +501,7 @@ export class SecurityService {
   }
 
   async getRoleDistribution() {
+    await this.ensureSecurityRuntimeTables();
     const rows = await this.prisma.$queryRawUnsafe<Array<{ role: string; count: string }>>(
       `SELECT role, COUNT(*)::text AS count
        FROM security_user_state
@@ -442,6 +518,7 @@ export class SecurityService {
   }
 
   async logActivity(userId: string, event: SecurityActivity) {
+    await this.ensureSecurityRuntimeTables();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO security_logs (id, user_id, ip_address, device, action, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -455,6 +532,7 @@ export class SecurityService {
   }
 
   private async storeCode(userId: string, kind: 'verify' | 'reset', code: string) {
+    await this.ensureSecurityRuntimeTables();
     await this.prisma.$executeRawUnsafe(
       `UPDATE security_codes
        SET consumed_at = NOW()
@@ -475,6 +553,7 @@ export class SecurityService {
   }
 
   private async consumeCode(userId: string, kind: 'verify' | 'reset', code: string) {
+    await this.ensureSecurityRuntimeTables();
     const codeHash = this.hash(code);
     const rows = await this.prisma.$queryRawUnsafe<Array<{ id: string; expires_at: Date; consumed_at: Date | null }>>(
       `SELECT id, expires_at, consumed_at
