@@ -29,6 +29,9 @@ class ApiService {
   private refreshTokenValue: string | null = null;
 
   constructor() {
+    this.token = localStorage.getItem('accessToken');
+    this.refreshTokenValue = localStorage.getItem('refreshToken');
+
     this.api = axios.create({
       baseURL: API_BASE_URL,
       timeout: 15000,
@@ -39,14 +42,10 @@ class ApiService {
       if (activeToken) {
         config.headers = config.headers || {};
         (config.headers as Record<string, string>)['Authorization'] = `Bearer ${activeToken}`;
-      } else if (config.url?.endsWith('/auth/me')) {
-        console.warn('apiService: no access token available for /auth/me request');
       }
       return config;
     });
 
-    this.token = localStorage.getItem('accessToken');
-    this.refreshTokenValue = localStorage.getItem('refreshToken');
     this.setAuthHeader();
   }
 
@@ -145,7 +144,15 @@ class ApiService {
   }
 
   async getMe(): Promise<User> {
-    const response = await this.api.get<User>('/auth/me');
+    const token = this.token || localStorage.getItem('accessToken');
+    if (!token) {
+      throw new Error('No access token available for getMe');
+    }
+    const response = await this.api.get<User>('/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     return response.data;
   }
 
