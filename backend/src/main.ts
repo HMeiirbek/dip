@@ -8,13 +8,14 @@ async function bootstrap() {
   app.useWebSocketAdapter(new IoAdapter(app));
   app.setGlobalPrefix('api/v1');
   const corsOriginEnv = process.env.CORS_ORIGIN?.trim();
-  const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001', 'https://dip-opal.vercel.app'];
-  const corsOrigins = corsOriginEnv
-    ? corsOriginEnv.split(',').map((v) => v.trim()).filter(Boolean)
-    : defaultOrigins;
+  const corsOrigins = (() => {
+    if (!corsOriginEnv) return true;
+    const origins = corsOriginEnv.split(',').map((v) => v.trim()).filter(Boolean);
+    return origins.length === 1 && origins[0] === '*' ? true : origins;
+  })();
   const corsOptions = {
-    origin: corsOrigins.length === 1 && corsOrigins[0] === '*' ? true : corsOrigins,
-    credentials: true,
+    origin: corsOrigins,                                                  
+    credentials: true,                                                            
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin'],
     exposedHeaders: ['Authorization'],
