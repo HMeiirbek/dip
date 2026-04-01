@@ -23,7 +23,9 @@ export class AdminService {
 
   async moderationPresence() {
     const snapshot = this.presence.getPresenceSnapshot();
-    const onlineIds = snapshot.map((entry) => entry.userId);
+    const socketOnlineIds = snapshot.map((entry) => entry.userId);
+    const sessionOnlineIds = await this.getRecentActiveSessionUserIds();
+    const onlineIds = Array.from(new Set([...socketOnlineIds, ...sessionOnlineIds]));
 
     const [users, roles, sessionRows] = await Promise.all([
       onlineIds.length
@@ -182,7 +184,10 @@ export class AdminService {
     const sessionsById = new Map(sessionRows.map((row) => [row.user_id, row]));
     const callsById = new Map(callRows.map((row) => [row.user_id, row]));
     const reportsById = new Map(reportRows.map((row) => [row.user_id, row]));
-    const onlineIds = new Set(this.presence.getOnlineUserIds());
+    const onlineIds = new Set([
+      ...this.presence.getOnlineUserIds(),
+      ...(await this.getRecentActiveSessionUserIds(userIds)),
+    ]);
 
     return users.map((user) => {
       const roleRow = rolesById.get(user.id);
@@ -322,6 +327,7 @@ export class AdminService {
       .getPresenceSnapshot()
       .filter((entry) => entry.userId === id);
     const roleRow = roleRows[0];
+    const fallbackOnlineIds = await this.getRecentActiveSessionUserIds([id]);
     const mappedSessions = sessionRows.map((row) => ({
       id: row.id,
       role: row.role,
@@ -342,7 +348,7 @@ export class AdminService {
         createdAt: user.createdAt,
         role: roleRow?.role || 'user',
         verified: Boolean(roleRow?.is_verified),
-        online: presenceEntries.length > 0,
+        online: presenceEntries.length > 0 || fallbackOnlineIds.includes(id),
       },
       presence: presenceEntries,
       stats: {
@@ -1729,5 +1735,26 @@ export class AdminService {
     }
 
     return anomalies.slice(-200);
+  }
+
+  private async getRecentActiveSessionUserIds(userIds?: string[]) {
+    const rows = userIds?.length
+      ? await this.prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+          `SELECT DISTINCT user_id
+           FROM security_sessions
+           WHERE user_id = ANY($1::text[])
+             AND revoked_at IS NULL
+             AND expires_at > NOW()
+             AND last_seen_at >= NOW() - INTERVAL '2 minutes'`,
+          userIds,
+        )
+      : await this.prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+          `SELECT DISTINCT user_id
+           FROM security_sessions
+           WHERE revoked_at IS NULL
+             AND expires_at > NOW()
+             AND last_seen_at >= NOW() - INTERVAL '2 minutes'`,
+        );
+    return rows.map((row) => row.user_id);
   }
 }

@@ -33,7 +33,17 @@ export class UsersService {
       },
     });
 
-    const onlineSet = new Set(this.presence.getOnlineUserIds());
+    const sessionRows = await this.prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+      `SELECT DISTINCT user_id
+       FROM security_sessions
+       WHERE revoked_at IS NULL
+         AND expires_at > NOW()
+         AND last_seen_at >= NOW() - INTERVAL '2 minutes'`,
+    );
+    const onlineSet = new Set([
+      ...this.presence.getOnlineUserIds(),
+      ...sessionRows.map((row) => row.user_id),
+    ]);
     return users.map((user) => ({
       ...user,
       online: onlineSet.has(user.id),
