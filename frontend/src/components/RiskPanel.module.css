@@ -1,0 +1,371 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.heroCard {
+  display: grid;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(88, 101, 242, 0.10) 0%, rgba(237, 66, 69, 0.08) 100%);
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.heroCardDesktop {
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+}
+
+.heroCardMobile {
+  grid-template-columns: 1fr;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(20px, 2vw + 14px, 30px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.heroText {
+  margin: 0;
+  color: var(--muted);
+  max-width: 620px;
+  line-height: 1.55;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.heroMeterCard {
+  background: var(--panel-bg);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.heroScore {
+  font-size: clamp(40px, 5vw + 18px, 56px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.heroMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.meterTrack {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--panel-bg2);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+.metricGrid {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.metricGridDesktop {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.metricGridMobile {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid2 {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.grid2Desktop {
+  grid-template-columns: 1.05fr 0.95fr;
+}
+
+.grid2Mobile {
+  grid-template-columns: 1fr;
+}
+
+.card {
+  background: var(--panel-bg);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cardHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.sectionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inlineForm {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.input {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 180px;
+  background: var(--panel-bg2);
+  color: var(--text);
+  flex: 1 1 220px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 104px;
+  resize: vertical;
+  background: var(--panel-bg2);
+  color: var(--text);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.resultCard {
+  background: var(--panel-bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.listBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+  min-width: 0;
+}
+
+.listItemBetween {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--panel-bg2);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  min-width: 0;
+}
+
+.listItemColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.listItemColumnRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.statusCard {
+  background: var(--panel-bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.statusValue {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.metricCard {
+  background: var(--panel-bg);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.metricValue {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.metricMiniCard {
+  background: var(--panel-bg2);
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.metricMiniValue {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.summaryLabel {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.subtle {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  white-space: nowrap;
+}
+
+.primaryButton {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  transition: transform 120ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  box-shadow: 0 8px 24px rgba(88, 101, 242, 0.22);
+}
+
+.secondaryButton {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-bg2);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 900;
+  transition: transform 120ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.primaryButton:active,
+.secondaryButton:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 420px) {
+  .heroCard,
+  .card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .metricCard {
+    padding: 12px;
+  }
+}
+

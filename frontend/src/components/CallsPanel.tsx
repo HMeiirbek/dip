@@ -3,6 +3,7 @@ import { Call, CallStatus as CallStatusType } from '../types';
 import { UserList } from './UserList';
 import { CallStatus } from './CallStatus';
 import { AudioStream } from './AudioStream';
+import s from './CallsPanel.module.css';
 
 interface CallsPanelProps {
   currentUserId: string;
@@ -37,8 +38,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
   return (
-    <div style={{ ...styles.content, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
-      <div style={styles.leftPanel}>
+    <div className={[s.content, isMobile ? s.contentMobile : ''].filter(Boolean).join(' ')}>
+      <div className={s.leftPanel}>
         <UserList
           currentUserId={currentUserId}
           onCall={onCall}
@@ -46,8 +47,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
         />
       </div>
 
-      <div style={styles.rightPanel}>
-        <div style={styles.statusSection}>
+      <div className={s.rightPanel}>
+        <div className={s.statusSection}>
           <CallStatus
             status={callStatus}
             activeCall={activeCall}
@@ -61,8 +62,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
         </div>
 
         {(callStatus === 'active' || callStatus === 'calling') && (
-          <div style={styles.card}>
-            <div style={styles.audioGrid}>
+          <div className={s.card}>
+            <div className={s.audioGrid}>
               <AudioStream stream={localStream} isMuted={true} label="Your Audio" />
               <AudioStream stream={remoteStream} isMuted={false} label="Remote Audio" />
             </div>
@@ -71,15 +72,6 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
       </div>
     </div>
   );
-};
-
-const styles: Record<string, React.CSSProperties> = {
-  content: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
-  leftPanel: { minHeight: 360 },
-  rightPanel: { display: 'flex', flexDirection: 'column', gap: 12 },
-  statusSection: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220 },
-  card: { background: 'var(--surface)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)', border: '1px solid var(--border)' },
-  audioGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
 };
 
 function useMediaQuery(query: string) {

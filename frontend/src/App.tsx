@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import apiService, { getAxiosErrorMessage } from './services/api';
 import socketService from './services/socket';
 import { LoginForm } from './components/LoginForm';
@@ -9,6 +10,7 @@ import { AdminPage } from './components/AdminPage';
 import { ModeratorPage } from './components/ModeratorPage';
 import { UserDrawer } from './components/UserPage';
 import { useControlCenterData } from './hooks/useControlCenterData';
+import s from './App.module.css';
 import {
   User,
   Call,
@@ -825,17 +827,17 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div style={styles.appShell}>
-      <aside style={styles.sidebar}>
-        <div style={styles.brand}>
-          <div style={styles.brandDot} />
-          <div style={styles.brandText}>
-            <div style={styles.brandTitle}>DIP</div>
-            <div style={styles.brandSub}>control</div>
+    <div className={s.appShell}>
+      <aside className={s.sidebar}>
+        <div className={s.brand}>
+          <div className={s.brandDot} />
+          <div className={s.brandText}>
+            <div className={s.brandTitle}>DIP</div>
+            <div className={s.brandSub}>control</div>
           </div>
         </div>
 
-        <div style={styles.nav}>
+        <div className={s.nav}>
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
@@ -847,43 +849,43 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        <div style={styles.sidebarFooter}>
-          <button type="button" style={styles.profileBtn} onClick={() => setProfileOpen(true)} title="Profile">
-            <span style={styles.profileAvatar} aria-hidden="true">
+        <div className={s.sidebarFooter}>
+          <button type="button" className={s.profileBtn} onClick={() => setProfileOpen(true)} title="Profile">
+            <span className={s.profileAvatar} aria-hidden="true">
               {(currentUser.username?.[0] || 'U').toUpperCase()}
             </span>
-            <span style={styles.profileText}>
-              <span style={styles.profileName}>{currentUser.username}</span>
-              <span style={styles.profileMeta}>{currentUser.role || 'user'}</span>
+            <span className={s.profileText}>
+              <span className={s.profileName}>{currentUser.username}</span>
+              <span className={s.profileMeta}>{currentUser.role || 'user'}</span>
             </span>
           </button>
         </div>
       </aside>
 
-      <main style={styles.main}>
-        <div style={styles.topbar}>
-          <div style={styles.topbarLeft}>
-            <div style={styles.topbarTitle}>{activeTab.toUpperCase()}</div>
-            <div style={styles.topbarHint}>DIP Control Center</div>
+      <main className={s.main}>
+        <div className={s.topbar}>
+          <div className={s.topbarLeft}>
+            <div className={s.topbarTitle}>{activeTab.toUpperCase()}</div>
+            <div className={s.topbarHint}>DIP Control Center</div>
           </div>
-          <div style={styles.topbarActions}>
+          <div className={s.topbarActions}>
             <button
               type="button"
               onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-              style={styles.topbarButton}
+              className={s.topbarButton}
               title="Toggle theme"
             >
               {theme === 'dark' ? 'Light' : 'Dark'}
             </button>
-            <button onClick={handleRefreshAuth} style={styles.topbarButton}>Refresh</button>
-            <button onClick={handleLogout} style={styles.topbarDanger}>Logout</button>
+            <button onClick={handleRefreshAuth} className={s.topbarButton}>Refresh</button>
+            <button onClick={handleLogout} className={s.topbarDanger}>Logout</button>
           </div>
         </div>
 
-        {notice && <div style={styles.notice}>{notice}</div>}
-        {error && <div style={styles.error}>{error}</div>}
+        {notice && <div className={s.notice}>{notice}</div>}
+        {error && <div className={s.error}>{error}</div>}
 
-        <div style={styles.contentWrap}>
+        <div className={s.contentWrap}>
           {activeTab === 'calls' && (
             <CallsPanel
               currentUserId={currentUser.id}
@@ -1037,178 +1039,13 @@ const NavItem: React.FC<{ active: boolean; label: string; onClick: () => void }>
     <button
       type="button"
       onClick={onClick}
-      style={{
-        ...styles.navItem,
-        ...(active ? styles.navItemActive : null),
-      }}
+      className={[s.navItem, active ? s.navItemActive : ''].filter(Boolean).join(' ')}
     >
-      <span style={styles.navPill(active)} aria-hidden="true" />
-      <span style={styles.navLabel}>{label}</span>
+      <span className={[s.navPill, active ? s.navPillActive : ''].filter(Boolean).join(' ')} aria-hidden="true" />
+      <span className={s.navLabel}>{label}</span>
     </button>
   );
 };
-
-const styles: Record<string, any> = {
-  appShell: {
-    minHeight: '100vh',
-    display: 'grid',
-    gridTemplateColumns: '260px 1fr',
-  },
-  sidebar: {
-    background: 'var(--sidebar-bg)',
-    borderRight: '1px solid var(--border)',
-    padding: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  brand: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderRadius: 12,
-    background: 'var(--panel-bg2)',
-    border: '1px solid var(--border)',
-  },
-  brandDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 999,
-    background: 'var(--primary)',
-    boxShadow: '0 0 0 4px rgba(88, 101, 242, 0.18)',
-  },
-  brandText: { display: 'flex', flexDirection: 'column' },
-  brandTitle: { fontWeight: 900, color: 'var(--text)', letterSpacing: 0.2 },
-  brandSub: { fontSize: 12, color: 'var(--muted)', marginTop: 2 },
-
-  nav: { display: 'flex', flexDirection: 'column', gap: 6 },
-  navItem: {
-    width: '100%',
-    border: '1px solid transparent',
-    background: 'transparent',
-    color: 'var(--text)',
-    borderRadius: 10,
-    padding: '10px 10px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    fontWeight: 800,
-  },
-  navItemActive: {
-    background: 'rgba(88, 101, 242, 0.14)',
-    border: '1px solid rgba(88, 101, 242, 0.25)',
-  },
-  navPill: (active: boolean) =>
-    ({
-      width: 4,
-      height: 18,
-      borderRadius: 999,
-      background: active ? 'var(--primary)' : 'rgba(181,186,193,0.45)',
-    }) as React.CSSProperties,
-  navLabel: { flex: 1, textAlign: 'left' as const },
-
-  sidebarFooter: { marginTop: 'auto', paddingTop: 6 },
-  profileBtn: {
-    width: '100%',
-    display: 'flex',
-    gap: 10,
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    background: 'var(--panel-bg2)',
-    border: '1px solid var(--border)',
-    cursor: 'pointer',
-    color: 'var(--text)',
-  },
-  profileAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    background: 'linear-gradient(135deg, var(--primary) 0%, var(--success) 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 900,
-    color: '#fff',
-    flex: '0 0 auto',
-  },
-  profileText: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
-  profileName: { fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  profileMeta: { fontSize: 12, color: 'var(--muted)', textAlign: 'left' as const },
-
-  main: {
-    padding: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  topbar: {
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
-    background: 'var(--topbar-bg)',
-    border: '1px solid var(--border)',
-    borderRadius: 14,
-    padding: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    backdropFilter: 'blur(10px)',
-  },
-  topbarLeft: { display: 'flex', flexDirection: 'column' },
-  topbarTitle: { fontWeight: 950, letterSpacing: 0.8, fontSize: 14, color: 'var(--text)' },
-  topbarHint: { fontSize: 12, color: 'var(--muted)', marginTop: 2 },
-  topbarActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  topbarButton: {
-    padding: '8px 12px',
-    borderRadius: 10,
-    border: '1px solid var(--border)',
-    background: 'var(--panel-bg2)',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    fontWeight: 800,
-  },
-  topbarDanger: {
-    padding: '8px 12px',
-    borderRadius: 10,
-    border: '1px solid rgba(237, 66, 69, 0.35)',
-    background: 'rgba(237, 66, 69, 0.14)',
-    color: 'var(--text)',
-    cursor: 'pointer',
-    fontWeight: 900,
-  },
-  contentWrap: {
-    background: 'var(--panel-bg)',
-    border: '1px solid var(--border)',
-    borderRadius: 14,
-    padding: 12,
-    boxShadow: 'var(--shadow)',
-    minHeight: 420,
-  },
-  // Small responsive tweak: collapse sidebar on narrow screens
-  // (kept simple without routing/state; still looks Discord-ish on mobile)
-  // Applied at runtime via inline media query in JSX: handled by CSS grid below.
-  notice: {
-    background: 'rgba(35, 165, 90, 0.12)',
-    border: '1px solid rgba(35, 165, 90, 0.30)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    color: 'var(--text)',
-    fontWeight: 600,
-  },
-  error: {
-    background: 'rgba(237, 66, 69, 0.12)',
-    border: '1px solid rgba(237, 66, 69, 0.30)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    color: 'var(--text)',
-    fontWeight: 600,
-  },
-};
+// styles moved to App.module.css
 
 export default App;

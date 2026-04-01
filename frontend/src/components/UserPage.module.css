@@ -1,0 +1,257 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 2000;
+}
+
+.sheet {
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-strong);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  color: var(--text);
+}
+
+.sheetDesktop {
+  width: min(460px, 92vw);
+}
+
+.sheetMobile {
+  width: 100%;
+  height: min(92vh, 720px);
+  align-self: flex-end;
+  border-left: none;
+  border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.identityRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.minWidth0 {
+  min-width: 0;
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 950;
+  letter-spacing: 0.5px;
+  box-shadow: 0 12px 24px rgba(88, 101, 242, 0.25);
+  flex: 0 0 auto;
+}
+
+.nameRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-size: 18px;
+  font-weight: 950;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  background: rgba(13, 17, 23, 0.12);
+  padding: 1px 6px;
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.closeBtn {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  background: var(--panel-bg2);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 950;
+  line-height: 1;
+  transition: transform 120ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.closeBtn:active {
+  transform: translateY(1px);
+}
+
+.pillBase {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid transparent;
+}
+
+.rolePill {
+  composes: pillBase;
+  background: rgba(88, 101, 242, 0.12);
+  border-color: rgba(88, 101, 242, 0.30);
+  color: var(--text);
+}
+
+.verifiedPill {
+  composes: pillBase;
+  background: rgba(35, 165, 90, 0.14);
+  border-color: rgba(35, 165, 90, 0.34);
+  color: var(--text);
+}
+
+.unverifiedPill {
+  composes: pillBase;
+  background: rgba(250, 168, 26, 0.16);
+  border-color: rgba(250, 168, 26, 0.36);
+  color: var(--text);
+}
+
+.section {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--panel-bg2);
+}
+
+.sectionTitle {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actionGridMobile {
+  grid-template-columns: 1fr 1fr;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.statusGridMobile {
+  grid-template-columns: 1fr;
+}
+
+.statusCard {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.statusLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 950;
+}
+
+.statusValue {
+  font-size: 16px;
+  font-weight: 950;
+  color: var(--text);
+  margin-top: 6px;
+}
+
+.statusHint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.btnBase {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 900;
+  transition: transform 120ms ease, box-shadow 180ms ease, opacity 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.btnBase:active {
+  transform: translateY(1px);
+}
+
+.primaryButton {
+  composes: btnBase;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(88, 101, 242, 0.22);
+}
+
+.secondaryButton {
+  composes: btnBase;
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--text);
+}
+
+.secondaryButtonDisabled {
+  composes: btnBase;
+  border: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dangerButton {
+  composes: btnBase;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 950;
+}
+

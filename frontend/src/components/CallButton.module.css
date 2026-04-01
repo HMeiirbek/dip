@@ -1,0 +1,25 @@
+.button {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  transition: transform 120ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.22);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button:not(:disabled):active {
+  transform: translateY(1px);
+}
+

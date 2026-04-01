@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import s from './AudioStream.module.css';
 
 interface AudioStreamProps {
   stream: MediaStream | null;
@@ -23,47 +24,18 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
   }, [stream]);
 
   return (
-    <div style={styles.container}>
-      <div style={styles.label}>{label}</div>
+    <div className={s.container}>
+      <div className={s.label}>{label}</div>
       <audio
         ref={audioRef}
-        style={styles.audio}
+        className={s.audio}
         autoPlay
         playsInline
         muted={isMuted}
       />
-      <div style={styles.status}>
+      <div className={s.status}>
         {stream ? '🔊 Stream Active' : '⏸️ No Stream'}
       </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    background: 'var(--surface)',
-    borderRadius: '8px',
-    padding: '15px',
-    boxShadow: 'var(--shadow)',
-    border: '1px solid var(--border)',
-  } as React.CSSProperties,
-
-  label: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: 'var(--muted)',
-    marginBottom: '8px',
-    textTransform: 'uppercase' as const,
-  } as React.CSSProperties,
-
-  audio: {
-    width: '100%',
-  } as React.CSSProperties,
-
-  status: {
-    marginTop: '10px',
-    fontSize: '12px',
-    color: 'var(--muted)',
-    textAlign: 'center' as const,
-  } as React.CSSProperties,
 };

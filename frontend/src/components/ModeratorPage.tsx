@@ -7,6 +7,7 @@ import {
   ModeratorOverview,
   ModeratorPresenceSnapshot,
 } from '../types';
+import s from './ModeratorPage.module.css';
 
 type PageProps = {
   isModeratorLike: boolean;
@@ -170,39 +171,39 @@ export const ModeratorPage: React.FC<PageProps> = ({
   const currentPage = Math.floor(callFlagsOffset / Math.max(1, callFlagsLimit)) + 1;
 
   if (!isModeratorLike) {
-    return <div style={styles.empty}>No access. Moderator or admin role required.</div>;
+    return <div className={s.empty}>No access. Moderator or admin role required.</div>;
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.pageHeader}>
+    <div className={s.page}>
+      <div className={s.pageHeader}>
         <div>
-          <div style={styles.eyebrow}>Moderator Workspace</div>
-          <h2 style={styles.heading}>Live moderation and call operations</h2>
-          <div style={styles.subtle}>
+          <div className={s.eyebrow}>Moderator Workspace</div>
+          <h2 className={s.heading}>Live moderation and call operations</h2>
+          <div className={s.subtle}>
             Role: <b>{role || 'moderator'}</b>
           </div>
         </div>
-        <button style={styles.primaryButton} onClick={onReloadModerator}>Refresh live data</button>
+        <button className={s.primaryButton} onClick={onReloadModerator}>Refresh live data</button>
       </div>
 
-      <div style={styles.summaryGrid}>
+      <div className={s.summaryGrid}>
         <SummaryCard label="Online users" value={String(stableOnlineUsers.length)} />
         <SummaryCard label="Active calls" value={String(moderatorOverview?.callCount ?? 0)} />
         <SummaryCard label="Open flags" value={String(callFlags.filter((flag) => flag.status === 'open').length)} />
         <SummaryCard label="Live alerts" value={String(moderatorOverview?.qualitySummary?.alerts?.length || 0)} />
       </div>
 
-      <div style={styles.grid}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Online users</h3>
-            <span style={styles.subtleSmall}>
+      <div className={s.grid}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Online users</h3>
+            <span className={s.subtleSmall}>
               Updated {moderatorPresence?.generatedAt ? new Date(moderatorPresence.generatedAt).toLocaleTimeString() : '-'}
             </span>
           </div>
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
+          <div className={s.tableWrap}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>User</th>
@@ -231,12 +232,12 @@ export const ModeratorPage: React.FC<PageProps> = ({
           </div>
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Call quality summary</h3>
-            <div style={styles.inlineControls}>
-              <label style={styles.subtleSmall}>Filter</label>
-              <select value={callFilter} onChange={(e) => setCallFilter(e.target.value as typeof callFilter)} style={styles.select}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Call quality summary</h3>
+            <div className={s.inlineControls}>
+              <label className={s.subtleSmall}>Filter</label>
+              <select value={callFilter} onChange={(e) => setCallFilter(e.target.value as typeof callFilter)} className={s.select}>
                 <option value="all">All</option>
                 <option value="critical">Critical</option>
                 <option value="warning">Warning</option>
@@ -245,17 +246,17 @@ export const ModeratorPage: React.FC<PageProps> = ({
             </div>
           </div>
 
-          <div style={styles.metricGrid}>
+          <div className={s.metricGrid}>
             <MetricTile label="RTT p95" value={formatMetric(moderatorOverview?.qualitySummary?.aggregate.rttMs.p95, 'ms')} />
             <MetricTile label="Jitter p95" value={formatMetric(moderatorOverview?.qualitySummary?.aggregate.jitterMs.p95, 'ms')} />
             <MetricTile label="Loss p95" value={formatMetric(moderatorOverview?.qualitySummary?.aggregate.packetLossPct.p95, '%')} />
             <MetricTile label="MOS avg" value={formatMetric(moderatorOverview?.qualitySummary?.aggregate.mosLike.avg, '')} />
           </div>
 
-          <div style={styles.listBox}>
+          <div className={s.listBox}>
             {(moderatorOverview?.qualitySummary?.alerts || []).slice(0, 24).map((alert, idx) => (
-              <div key={`${alert.callId}-${alert.metric}-${idx}`} style={styles.alertRow}>
-                <span style={alert.level === 'critical' ? styles.badgeCritical : styles.badgeWarning}>
+              <div key={`${alert.callId}-${alert.metric}-${idx}`} className={s.alertRow}>
+                <span className={alert.level === 'critical' ? s.badgeCritical : s.badgeWarning}>
                   {alert.level.toUpperCase()}
                 </span>
                 <span>{alert.message}</span>
@@ -266,13 +267,13 @@ export const ModeratorPage: React.FC<PageProps> = ({
         </section>
       </div>
 
-      <section style={styles.card}>
-        <div style={styles.cardHeaderRow}>
-          <h3 style={styles.cardTitle}>Current calls</h3>
-          {loading && <span style={styles.subtleSmall}>Loading...</span>}
+      <section className={s.card}>
+        <div className={s.cardHeaderRow}>
+          <h3 className={s.cardTitle}>Current calls</h3>
+          {loading && <span className={s.subtleSmall}>Loading...</span>}
         </div>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
+        <div className={s.tableWrap}>
+          <table className={s.table}>
             <thead>
               <tr>
                 <th>Status</th>
@@ -292,7 +293,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
                 return (
                   <tr
                     key={call.id}
-                    style={selectedCallId === call.id ? styles.selectedRow : undefined}
+                    className={selectedCallId === call.id ? s.selectedRow : undefined}
                     onClick={() => setSelectedCallId(call.id)}
                   >
                     <td>{call.status}</td>
@@ -308,17 +309,17 @@ export const ModeratorPage: React.FC<PageProps> = ({
                       Loss {formatMetric(call.quality?.packetLossPct, '%')}
                     </td>
                     <td>
-                      <div style={styles.actionColumn}>
+                      <div className={s.actionColumn}>
                         <input
-                          style={styles.inputCompact}
+                          className={s.inputCompact}
                           placeholder="flag reason"
                           value={reasonDraft}
                           onChange={(e) => setFlagReasonByCallId((prev) => ({ ...prev, [call.id]: e.target.value }))}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <div style={styles.inlineControls}>
+                        <div className={s.inlineControls}>
                           <button
-                            style={styles.smallButton}
+                            className={s.smallButton}
                             disabled={busyCallId === call.id}
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -334,7 +335,7 @@ export const ModeratorPage: React.FC<PageProps> = ({
                             Flag
                           </button>
                           <button
-                            style={styles.smallDanger}
+                            className={s.smallDanger}
                             disabled={busyCallId === call.id}
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -364,40 +365,40 @@ export const ModeratorPage: React.FC<PageProps> = ({
         </div>
       </section>
 
-      <div style={styles.grid}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Selected call inspection</h3>
+      <div className={s.grid}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Selected call inspection</h3>
             {selectedCallId && (
-              <button style={styles.smallButton} onClick={() => onResolveAllFlagsForCall(selectedCallId)}>
+              <button className={s.smallButton} onClick={() => onResolveAllFlagsForCall(selectedCallId)}>
                 Resolve all flags
               </button>
             )}
           </div>
           {qualityHistory?.call ? (
             <>
-              <div style={styles.detailMeta}>
+              <div className={s.detailMeta}>
                 <span>{`${qualityHistory.call.caller.username} -> ${qualityHistory.call.callee.username}`}</span>
                 <span>{qualityHistory.call.status}</span>
               </div>
-              <div style={styles.metricGrid}>
+              <div className={s.metricGrid}>
                 <MetricTile label="Samples" value={String(qualityHistory.summary?.sampleCount || 0)} />
                 <MetricTile label="RTT p95" value={formatMetric(qualityHistory.summary?.rttMs.p95, 'ms')} />
                 <MetricTile label="Loss p95" value={formatMetric(qualityHistory.summary?.packetLossPct.p95, '%')} />
                 <MetricTile label="MOS avg" value={formatMetric(qualityHistory.summary?.mosLike.avg, '')} />
               </div>
-              <div style={styles.listBox}>
+              <div className={s.listBox}>
                 {(qualityHistory.summary?.anomalies || []).slice(-30).map((item, idx) => (
-                  <div key={`${item.at}-${item.metric}-${idx}`} style={styles.listRowColumn}>
+                  <div key={`${item.at}-${item.metric}-${idx}`} className={s.listRowColumn}>
                     <strong>{item.metric}</strong>
                     <small>{new Date(item.at).toLocaleString()} | {item.level} | {item.value} ({item.threshold})</small>
                   </div>
                 ))}
                 {!qualityHistory.summary?.anomalies?.length && <small>No anomalies detected</small>}
               </div>
-              <div style={styles.listBox}>
+              <div className={s.listBox}>
                 {(qualityHistory.timeline || []).slice(-20).map((event, idx) => (
-                  <div key={`${event.at}-${event.type}-${idx}`} style={styles.listRowColumn}>
+                  <div key={`${event.at}-${event.type}-${idx}`} className={s.listRowColumn}>
                     <strong>{event.type}</strong>
                     <small>{new Date(event.at).toLocaleString()} | {event.actorName || 'system'}</small>
                     <small>{event.message}</small>
@@ -407,58 +408,58 @@ export const ModeratorPage: React.FC<PageProps> = ({
               </div>
             </>
           ) : (
-            <div style={styles.subtle}>Select a live call to inspect quality history.</div>
+            <div className={s.subtle}>Select a live call to inspect quality history.</div>
           )}
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Flag queue</h3>
-            <div style={styles.inlineControls}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Flag queue</h3>
+            <div className={s.inlineControls}>
               <select
                 value={callFlagsStatus}
                 onChange={(e) => {
                   setCallFlagsOffset(0);
                   setCallFlagsStatus(e.target.value as 'open' | 'resolved' | 'all');
                 }}
-                style={styles.select}
+                className={s.select}
               >
                 <option value="open">Open</option>
                 <option value="resolved">Resolved</option>
                 <option value="all">All</option>
               </select>
-              <button style={styles.smallButton} onClick={onReloadModerator}>Refresh</button>
+              <button className={s.smallButton} onClick={onReloadModerator}>Refresh</button>
             </div>
           </div>
 
-          <div style={styles.inlineControlsWrap}>
+          <div className={s.inlineControlsWrap}>
             <input
-              style={styles.input}
+              className={s.input}
               placeholder="Search call/reason/user"
               value={flagSearchDraft}
               onChange={(e) => setFlagSearchDraft(e.target.value)}
             />
-            <select value={callFlagsSortBy} onChange={(e) => setCallFlagsSortBy(e.target.value as typeof callFlagsSortBy)} style={styles.select}>
+            <select value={callFlagsSortBy} onChange={(e) => setCallFlagsSortBy(e.target.value as typeof callFlagsSortBy)} className={s.select}>
               <option value="createdAt">Created</option>
               <option value="status">Status</option>
               <option value="actorRole">Actor Role</option>
             </select>
-            <select value={callFlagsSortDir} onChange={(e) => setCallFlagsSortDir(e.target.value as typeof callFlagsSortDir)} style={styles.select}>
+            <select value={callFlagsSortDir} onChange={(e) => setCallFlagsSortDir(e.target.value as typeof callFlagsSortDir)} className={s.select}>
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
             </select>
           </div>
 
-          <div style={styles.listBox}>
+          <div className={s.listBox}>
             {callFlags.map((flag) => (
-              <div key={flag.id} style={styles.listRowColumn}>
+              <div key={flag.id} className={s.listRowColumn}>
                 <strong>{flag.call ? `${flag.call.caller.username} -> ${flag.call.callee.username}` : flag.callId}</strong>
                 <small>{new Date(flag.createdAt).toLocaleString()} | {flag.status} | by {flag.actorRole}</small>
                 <small>Reason: {flag.reason}</small>
-                <div style={styles.inlineControls}>
-                  <button style={styles.smallButton} onClick={() => setSelectedCallId(flag.callId)}>Inspect</button>
+                <div className={s.inlineControls}>
+                  <button className={s.smallButton} onClick={() => setSelectedCallId(flag.callId)}>Inspect</button>
                   {flag.status === 'open' && (
-                    <button style={styles.smallButton} onClick={() => onResolveCallFlag(flag.id)}>Resolve</button>
+                    <button className={s.smallButton} onClick={() => onResolveCallFlag(flag.id)}>Resolve</button>
                   )}
                 </div>
               </div>
@@ -466,17 +467,17 @@ export const ModeratorPage: React.FC<PageProps> = ({
             {!callFlags.length && <small>No flags in this view</small>}
           </div>
 
-          <div style={styles.paginationRow}>
-            <span style={styles.subtleSmall}>Page {currentPage}/{totalPages}</span>
+          <div className={s.paginationRow}>
+            <span className={s.subtleSmall}>Page {currentPage}/{totalPages}</span>
             <button
-              style={styles.smallButton}
+              className={s.smallButton}
               disabled={currentPage <= 1}
               onClick={() => setCallFlagsOffset(Math.max(0, callFlagsOffset - callFlagsLimit))}
             >
               Prev
             </button>
             <button
-              style={styles.smallButton}
+              className={s.smallButton}
               disabled={currentPage >= totalPages}
               onClick={() => setCallFlagsOffset(callFlagsOffset + callFlagsLimit)}
             >
@@ -490,15 +491,15 @@ export const ModeratorPage: React.FC<PageProps> = ({
 };
 
 const SummaryCard: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryLabel}>{label}</div>
-    <div style={styles.summaryValue}>{value}</div>
+  <div className={s.summaryCard}>
+    <div className={s.summaryLabel}>{label}</div>
+    <div className={s.summaryValue}>{value}</div>
   </div>
 );
 
 const OnlineUserRow = React.memo(
   ({ user, changed }: { user: ModeratorOnlineUser; changed: boolean }) => (
-    <tr style={changed ? styles.updatedRow : styles.tableRow}>
+    <tr className={[s.tableRow, changed ? s.updatedRow : ''].filter(Boolean).join(' ')}>
       <td>{user.username}</td>
       <td>{user.role}</td>
       <td>{user.ipAddress}</td>
@@ -510,9 +511,9 @@ const OnlineUserRow = React.memo(
 );
 
 const MetricTile: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div style={styles.metricCard}>
-    <div style={styles.summaryLabel}>{label}</div>
-    <div style={styles.metricValue}>{value}</div>
+  <div className={s.metricCard}>
+    <div className={s.summaryLabel}>{label}</div>
+    <div className={s.metricValue}>{value}</div>
   </div>
 );
 
@@ -529,9 +530,9 @@ function formatMetric(value: number | null | undefined, suffix: string) {
 }
 
 function renderQualityBadge(level?: 'warning' | 'critical') {
-  if (level === 'critical') return <span style={styles.badgeCritical}>critical</span>;
-  if (level === 'warning') return <span style={styles.badgeWarning}>warning</span>;
-  return <span style={styles.badgeHealthy}>clean</span>;
+  if (level === 'critical') return <span className={s.badgeCritical}>critical</span>;
+  if (level === 'warning') return <span className={s.badgeWarning}>warning</span>;
+  return <span className={s.badgeHealthy}>clean</span>;
 }
 
 function sortOnlineUsers(users: ModeratorOnlineUser[]) {
@@ -584,51 +585,4 @@ function reconcileOnlineUsers(prev: ModeratorOnlineUser[], next: ModeratorOnline
   return { users, changed, changedIds };
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
-  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.4, fontSize: 11, color: 'var(--muted)' },
-  heading: { margin: '6px 0 4px', fontSize: 24 },
-  subtle: { fontSize: 13, color: 'var(--muted)' },
-  subtleSmall: { fontSize: 12, color: 'var(--muted)' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  summaryCard: { background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 18, padding: 16, boxShadow: 'var(--shadow-soft)' },
-  summaryLabel: { color: 'var(--muted)', fontSize: 12, marginBottom: 6 },
-  summaryValue: { fontSize: 28, fontWeight: 900 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 },
-  card: { background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 20, padding: 16, boxShadow: 'var(--shadow-soft)', display: 'flex', flexDirection: 'column', gap: 12 },
-  cardHeaderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  cardTitle: { margin: 0, fontSize: 18 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  tableRow: {
-    transition: 'background-color 220ms ease, transform 220ms ease',
-  },
-  updatedRow: {
-    background: 'rgba(35,165,90,0.12)',
-    transform: 'translateZ(0)',
-    transition: 'background-color 220ms ease, transform 220ms ease',
-  },
-  metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 },
-  metricCard: { background: 'var(--panel-bg2)', borderRadius: 14, padding: 12, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 },
-  metricValue: { fontSize: 20, fontWeight: 800 },
-  listBox: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 },
-  alertRow: { display: 'flex', gap: 10, alignItems: 'center', padding: 10, borderRadius: 12, background: 'var(--panel-bg2)' },
-  badgeCritical: { display: 'inline-flex', padding: '3px 8px', borderRadius: 999, background: 'rgba(239,68,68,0.18)', color: '#ef4444', fontSize: 11, fontWeight: 800 },
-  badgeWarning: { display: 'inline-flex', padding: '3px 8px', borderRadius: 999, background: 'rgba(245,158,11,0.18)', color: '#f59e0b', fontSize: 11, fontWeight: 800 },
-  badgeHealthy: { display: 'inline-flex', padding: '3px 8px', borderRadius: 999, background: 'rgba(34,197,94,0.18)', color: '#22c55e', fontSize: 11, fontWeight: 800 },
-  inlineControls: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  inlineControlsWrap: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  select: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '8px 10px' },
-  input: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '8px 10px', minWidth: 180 },
-  inputCompact: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '6px 8px', width: 140 },
-  primaryButton: { borderRadius: 12, border: 'none', background: 'var(--primary)', color: '#fff', padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  smallButton: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '6px 10px', cursor: 'pointer' },
-  smallDanger: { borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.12)', color: '#ef4444', padding: '6px 10px', cursor: 'pointer' },
-  actionColumn: { display: 'flex', flexDirection: 'column', gap: 8 },
-  selectedRow: { background: 'rgba(12,108,255,0.08)' },
-  detailMeta: { display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--muted)' },
-  listRowColumn: { display: 'flex', flexDirection: 'column', gap: 4, padding: 10, borderRadius: 12, background: 'var(--panel-bg2)' },
-  paginationRow: { display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' },
-  empty: { padding: 20, borderRadius: 16, background: 'var(--panel-bg)', border: '1px solid var(--border)' },
-};
+// styles moved to ModeratorPage.module.css
