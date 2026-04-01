@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SecurityActivityItem, SecuritySession } from '../types';
+import s from './SecurityPanel.module.css';
 
 interface SecurityPanelProps {
   securitySessions: SecuritySession[];
@@ -41,68 +42,68 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   const isMobile = useMediaQuery('(max-width: 840px)');
   const activeSessions = securitySessions.filter((session) => session.active);
   return (
-    <div style={{ ...styles.grid2, gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
-      <div style={styles.card}>
-        <h3 style={styles.cardTitle}>Verification & Sessions</h3>
-        <div style={styles.row}>
-          <button style={styles.primaryButton} onClick={onRequestVerify}>Request Verify Code</button>
-          <button style={styles.secondaryButton} onClick={onRefreshSecurity}>Refresh</button>
+    <div className={[s.grid, isMobile ? s.gridMobile : ''].filter(Boolean).join(' ')}>
+      <div className={s.card}>
+        <h3 className={s.cardTitle}>Verification & Sessions</h3>
+        <div className={s.row}>
+          <button className={s.primaryButton} onClick={onRequestVerify}>Request Verify Code</button>
+          <button className={s.secondaryButton} onClick={onRefreshSecurity}>Refresh</button>
         </div>
-        <div style={styles.row}>
+        <div className={s.row}>
           <input
-            style={styles.input}
+            className={s.input}
             placeholder="Verify code"
             value={verifyCode}
             onChange={(e) => setVerifyCode(e.target.value)}
           />
-          <button style={styles.primaryButton} onClick={onVerify}>Verify</button>
+          <button className={s.primaryButton} onClick={onVerify}>Verify</button>
         </div>
 
         <h4>Active Sessions ({activeSessions.length})</h4>
-        <div style={styles.listBox}>
-          {activeSessions.map((s) => (
-            <div key={s.id} style={styles.listItem}>
+        <div className={s.listBox}>
+          {activeSessions.map((session) => (
+            <div key={session.id} className={s.listItem}>
               <div>
-                <div>{s.deviceInfo} | {s.ipAddress}</div>
-                <small>{new Date(s.createdAt).toLocaleString()}</small>
+                <div>{session.deviceInfo} | {session.ipAddress}</div>
+                <small>{new Date(session.createdAt).toLocaleString()}</small>
               </div>
-              <button style={styles.smallDanger} onClick={() => onTerminateSession(s.id)}>Terminate</button>
+              <button className={s.smallDanger} onClick={() => onTerminateSession(session.id)}>Terminate</button>
             </div>
           ))}
-          {!activeSessions.length && <div style={styles.emptyState}>No active sessions</div>}
+          {!activeSessions.length && <div className={s.emptyState}>No active sessions</div>}
         </div>
       </div>
 
-      <div style={styles.card}>
-        <h3 style={styles.cardTitle}>Forgot / Reset Password</h3>
-        <div style={styles.stack}>
+      <div className={s.card}>
+        <h3 className={s.cardTitle}>Forgot / Reset Password</h3>
+        <div className={s.stack}>
           <input
-            style={styles.input}
+            className={s.input}
             placeholder="Username"
             value={resetIdentifier}
             onChange={(e) => setResetIdentifier(e.target.value)}
           />
-          <button style={styles.secondaryButton} onClick={onRequestResetCode}>Request Reset Code</button>
+          <button className={s.secondaryButton} onClick={onRequestResetCode}>Request Reset Code</button>
           <input
-            style={styles.input}
+            className={s.input}
             placeholder="Reset code"
             value={resetCode}
             onChange={(e) => setResetCode(e.target.value)}
           />
           <input
-            style={styles.input}
+            className={s.input}
             placeholder="New password"
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
-          <button style={styles.primaryButton} onClick={onResetPassword}>Reset Password</button>
+          <button className={s.primaryButton} onClick={onResetPassword}>Reset Password</button>
         </div>
 
-        <h4 style={{ marginTop: 16 }}>Security Activity ({securityActivity.length})</h4>
-        <div style={styles.listBox}>
+        <h4 className={s.activityTitle}>Security Activity ({securityActivity.length})</h4>
+        <div className={s.listBox}>
           {securityActivity.map((a, idx) => (
-            <div key={`${a.action}-${idx}`} style={styles.listItemColumn}>
+            <div key={`${a.action}-${idx}`} className={s.listItemColumn}>
               <strong>{a.action}</strong>
               <small>{new Date(a.at).toLocaleString()} | {a.ipAddress || 'n/a'}</small>
             </div>
@@ -113,38 +114,7 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   );
 };
 
-const styles: Record<string, React.CSSProperties> = {
-  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
-  card: { background: 'var(--surface)', borderRadius: 12, padding: 14, boxShadow: 'var(--shadow)', border: '1px solid var(--border)' },
-  cardTitle: { marginTop: 0, marginBottom: 10 },
-  row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
-  stack: { display: 'flex', flexDirection: 'column', gap: 8 },
-  input: { padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, minWidth: 180, background: 'var(--surface)', color: 'var(--text)' },
-  listBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    maxHeight: 260,
-    overflowY: 'auto',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
-    padding: 8,
-    background: 'var(--surface2)',
-  },
-  listItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-    borderBottom: '1px solid var(--border)',
-    paddingBottom: 6,
-  },
-  listItemColumn: { display: 'flex', flexDirection: 'column', gap: 2, borderBottom: '1px solid var(--border)', paddingBottom: 6 },
-  emptyState: { color: 'var(--muted)', fontSize: 13, padding: '8px 4px' },
-  primaryButton: { padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontWeight: 800 },
-  secondaryButton: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontWeight: 800 },
-  smallDanger: { padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--danger)', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 12 },
-};
+// styles moved to SecurityPanel.module.css
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState<boolean>(() => {

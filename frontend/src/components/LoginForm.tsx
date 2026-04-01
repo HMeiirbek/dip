@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiService from '../services/api';
+import s from './LoginForm.module.css';
 
 interface LoginFormProps {
   onSuccess: (token: string, username: string) => void;
@@ -52,33 +53,33 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>DIP</h1>
-        <p style={styles.subtitle}>Secure Voice Communication</p>
+    <div className={s.container}>
+      <div className={s.card}>
+        <h1 className={s.title}>DIP</h1>
+        <p className={s.subtitle}>Secure Voice Communication</p>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Username</label>
+        <form onSubmit={handleSubmit} className={s.form}>
+          <div className={s.formGroup}>
+            <label className={s.label}>Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter your username"
-              style={styles.input}
+              className={s.input}
               disabled={isLoading}
               required
             />
           </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Password</label>
+          <div className={s.formGroup}>
+            <label className={s.label}>Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              style={styles.input}
+              className={s.input}
               disabled={isLoading}
               required
             />
@@ -87,11 +88,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
           <button
             type="submit"
             disabled={isLoading}
-            style={{
-              ...styles.button,
-              opacity: isLoading ? 0.6 : 1,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-            }}
+            className={s.primaryButton}
           >
             {isLoading
               ? 'Loading...'
@@ -101,8 +98,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
           </button>
         </form>
 
-        <div style={styles.toggleAuth}>
-          <span style={styles.toggleText}>
+        <div className={s.toggleAuth}>
+          <span className={s.toggleText}>
             {isRegister
               ? 'Already have an account? '
               : "Don't have an account? "}
@@ -110,7 +107,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
           <button
             type="button"
             onClick={() => setIsRegister(!isRegister)}
-            style={styles.toggleButton}
+            className={s.toggleButton}
             disabled={isLoading}
           >
             {isRegister ? 'Sign In' : 'Create Account'}
@@ -119,101 +116,4 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
       </div>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    padding: '20px',
-  } as React.CSSProperties,
-
-  card: {
-    background: 'var(--surface)',
-    borderRadius: '12px',
-    boxShadow: 'var(--shadow)',
-    border: '1px solid var(--border)',
-    padding: '40px',
-    maxWidth: '400px',
-    width: '100%',
-  } as React.CSSProperties,
-
-  title: {
-    textAlign: 'center' as const,
-    color: 'var(--text)',
-    marginBottom: '10px',
-    fontSize: '32px',
-  } as React.CSSProperties,
-
-  subtitle: {
-    textAlign: 'center' as const,
-    color: 'var(--muted)',
-    marginBottom: '30px',
-    fontSize: '14px',
-  } as React.CSSProperties,
-
-  form: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '20px',
-  } as React.CSSProperties,
-
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '8px',
-  } as React.CSSProperties,
-
-  label: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: 'var(--text)',
-  } as React.CSSProperties,
-
-  input: {
-    padding: '12px',
-    fontSize: '14px',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    fontFamily: 'inherit',
-    transition: 'border-color 0.2s',
-    outline: 'none',
-    background: 'var(--surface)',
-    color: 'var(--text)',
-  } as React.CSSProperties,
-
-  button: {
-    padding: '12px',
-    fontSize: '16px',
-    fontWeight: '600',
-    color: 'white',
-    background: 'linear-gradient(135deg, var(--primary) 0%, rgba(34,197,94,0.95) 100%)',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'transform 0.2s',
-  } as React.CSSProperties,
-
-  toggleAuth: {
-    textAlign: 'center' as const,
-    marginTop: '20px',
-    fontSize: '14px',
-    color: 'var(--muted)',
-  } as React.CSSProperties,
-
-  toggleText: {
-    marginRight: '5px',
-  } as React.CSSProperties,
-
-  toggleButton: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--primary)',
-    cursor: 'pointer',
-    fontWeight: '600',
-    textDecoration: 'underline',
-    fontSize: '14px',
-  } as React.CSSProperties,
 };

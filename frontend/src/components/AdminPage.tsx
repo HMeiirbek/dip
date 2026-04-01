@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import apiService, { getAxiosErrorMessage } from '../services/api';
+import s from './AdminPage.module.css';
 import {
   AdminAnalytics,
   AdminDashboard,
@@ -55,7 +57,7 @@ export const AdminPage: React.FC<Props> = ({
   currentUserId,
   loading,
   adminDashboard,
-  adminAnalytics,
+  adminAnalytics: _adminAnalytics,
   adminSlaSummary,
   adminReports,
   adminLogs,
@@ -139,7 +141,7 @@ export const AdminPage: React.FC<Props> = ({
   }, [selectedUserId]);
 
   if (!isAdmin) {
-    return <div style={styles.empty}>No access. Admin role required.</div>;
+    return <div className={s.empty}>No access. Admin role required.</div>;
   }
 
   const refreshSelectedUser = async () => {
@@ -163,20 +165,20 @@ export const AdminPage: React.FC<Props> = ({
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.pageHeader}>
+    <div className={s.page}>
+      <div className={s.pageHeader}>
         <div>
-          <div style={styles.eyebrow}>Admin Workspace</div>
-          <h2 style={styles.heading}>Users, sessions, logs and platform control</h2>
-          <div style={styles.subtle}>Full operational access with role and password management.</div>
+          <div className={s.eyebrow}>Admin Workspace</div>
+          <h2 className={s.heading}>Users, sessions, logs and platform control</h2>
+          <div className={s.subtle}>Full operational access with role and password management.</div>
         </div>
-        <div style={styles.headerActions}>
-          <button style={styles.secondaryButton} onClick={onReloadAdmin}>Reload admin data</button>
-          <button style={styles.primaryButton} onClick={onReloadMl}>Reload ML</button>
+        <div className={s.headerActions}>
+          <button className={s.secondaryButton} onClick={onReloadAdmin}>Reload admin data</button>
+          <button className={s.primaryButton} onClick={onReloadMl}>Reload ML</button>
         </div>
       </div>
 
-      <div style={styles.summaryGrid}>
+      <div className={s.summaryGrid}>
         <SummaryCard label="Users" value={String(adminDashboard?.users ?? adminUsers.length)} hint={`online ${adminUsers.filter((user) => user.online).length}`} />
         <SummaryCard label="Calls" value={String(adminDashboard?.totalCalls ?? 0)} hint={`ongoing ${adminDashboard?.ongoingCalls ?? 0}`} />
         <SummaryCard label="Live online" value={String(moderatorPresence?.onlineCount ?? 0)} hint="socket presence" />
@@ -187,14 +189,14 @@ export const AdminPage: React.FC<Props> = ({
         <SummaryCard label="ML" value={mlStatus?.active ? (mlStatus.model?.version || 'active') : 'inactive'} hint={`acc ${formatMetric(mlMetrics?.accuracy, '%')}`} />
       </div>
 
-      <div style={styles.gridSecondary}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Live presence</h3>
-            <button style={styles.smallButton} onClick={onReloadLiveOps}>Refresh live ops</button>
+      <div className={s.gridSecondary}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Live presence</h3>
+            <button className={s.smallButton} onClick={onReloadLiveOps}>Refresh live ops</button>
           </div>
-          <div style={styles.tableWrapShort}>
-            <table style={styles.table}>
+          <div className={s.tableWrapShort}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>User</th>
@@ -224,13 +226,13 @@ export const AdminPage: React.FC<Props> = ({
           </div>
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Live calls and quality</h3>
-            <span style={styles.subtleSmall}>{moderatorOverview?.qualitySummary?.alerts?.length || 0} alerts</span>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Live calls and quality</h3>
+            <span className={s.subtleSmall}>{moderatorOverview?.qualitySummary?.alerts?.length || 0} alerts</span>
           </div>
-          <div style={styles.tableWrapShort}>
-            <table style={styles.table}>
+          <div className={s.tableWrapShort}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>Status</th>
@@ -254,7 +256,7 @@ export const AdminPage: React.FC<Props> = ({
                       L {formatMetric(call.quality?.packetLossPct, '%')}
                     </td>
                     <td>
-                      <button style={styles.smallDanger} onClick={() => onForceEndCall(call.id)}>
+                      <button className={s.smallDanger} onClick={() => onForceEndCall(call.id)}>
                         Force End
                       </button>
                     </td>
@@ -269,9 +271,9 @@ export const AdminPage: React.FC<Props> = ({
             </table>
           </div>
 
-          <div style={styles.listBoxCompact}>
+          <div className={s.listBoxCompact}>
             {(moderatorOverview?.qualitySummary?.alerts || []).slice(0, 12).map((alert, idx) => (
-              <div key={`${alert.callId}-${alert.metric}-${idx}`} style={styles.listRowColumn}>
+              <div key={`${alert.callId}-${alert.metric}-${idx}`} className={s.listRowColumn}>
                 <strong>{alert.level.toUpperCase()} | {alert.metric}</strong>
                 <small>{alert.message}</small>
               </div>
@@ -281,23 +283,23 @@ export const AdminPage: React.FC<Props> = ({
         </section>
       </div>
 
-      <div style={styles.gridMain}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>User directory</h3>
-            {loading && <span style={styles.subtleSmall}>Loading...</span>}
+      <div className={s.gridMain}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>User directory</h3>
+            {loading && <span className={s.subtleSmall}>Loading...</span>}
           </div>
-          <div style={styles.inlineControlsWrap}>
+          <div className={s.inlineControlsWrap}>
             <input
-              style={styles.input}
+              className={s.input}
               placeholder="Search user / id / role"
               value={userQuery}
               onChange={(e) => setUserQuery(e.target.value)}
             />
-            <span style={styles.subtleSmall}>Total {filteredUsers.length}</span>
+            <span className={s.subtleSmall}>Total {filteredUsers.length}</span>
           </div>
-          <div style={styles.tableWrapTall}>
-            <table style={styles.table}>
+          <div className={s.tableWrapTall}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>User</th>
@@ -313,11 +315,14 @@ export const AdminPage: React.FC<Props> = ({
                 {filteredUsers.map((user) => (
                   <tr
                     key={user.id}
-                    style={selectedUserId === user.id ? styles.selectedRow : undefined}
+                    className={[
+                      s.clickableRow,
+                      selectedUserId === user.id ? s.selectedRow : '',
+                    ].filter(Boolean).join(' ')}
                     onClick={() => setSelectedUserId(user.id)}
                   >
                     <td>
-                      <div style={styles.listRowColumn}>
+                      <div className={s.listRowColumn}>
                         <strong>{user.username}</strong>
                         <small>{user.id.slice(0, 8)}... {user.online ? '● online' : '○ offline'}</small>
                       </div>
@@ -340,29 +345,29 @@ export const AdminPage: React.FC<Props> = ({
           </div>
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Selected user</h3>
-            {detailLoading && <span style={styles.subtleSmall}>Loading user...</span>}
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Selected user</h3>
+            {detailLoading && <span className={s.subtleSmall}>Loading user...</span>}
           </div>
-          {detailError && <div style={styles.errorBox}>{detailError}</div>}
+          {detailError && <div className={s.errorBox}>{detailError}</div>}
           {userDetail ? (
             <>
-              <div style={styles.detailHero}>
+              <div className={s.detailHero}>
                 <div>
-                  <div style={styles.detailTitle}>{userDetail.user.username}</div>
-                  <div style={styles.subtleSmall}>
+                  <div className={s.detailTitle}>{userDetail.user.username}</div>
+                  <div className={s.subtleSmall}>
                     {userDetail.user.id} | role {userDetail.user.role} | {userDetail.user.verified ? 'verified' : 'unverified'}
                   </div>
                 </div>
-                <div style={styles.inlineControls}>
-                  <button style={styles.smallButton} onClick={() => runUserAction('role-user', async () => onUpdateUserRole(userDetail.user.id, 'user'))}>user</button>
-                  <button style={styles.smallButton} onClick={() => runUserAction('role-moderator', async () => onUpdateUserRole(userDetail.user.id, 'moderator'))}>moderator</button>
-                  <button style={styles.smallButton} onClick={() => runUserAction('role-admin', async () => onUpdateUserRole(userDetail.user.id, 'admin'))}>admin</button>
+                <div className={s.inlineControls}>
+                  <button className={s.smallButton} onClick={() => runUserAction('role-user', async () => onUpdateUserRole(userDetail.user.id, 'user'))}>user</button>
+                  <button className={s.smallButton} onClick={() => runUserAction('role-moderator', async () => onUpdateUserRole(userDetail.user.id, 'moderator'))}>moderator</button>
+                  <button className={s.smallButton} onClick={() => runUserAction('role-admin', async () => onUpdateUserRole(userDetail.user.id, 'admin'))}>admin</button>
                 </div>
               </div>
 
-              <div style={styles.metricGrid}>
+              <div className={s.metricGrid}>
                 <MetricTile label="Total calls" value={String(userDetail.stats.totalCalls)} />
                 <MetricTile label="Initiated" value={String(userDetail.stats.initiatedCalls)} />
                 <MetricTile label="Received" value={String(userDetail.stats.receivedCalls)} />
@@ -371,21 +376,21 @@ export const AdminPage: React.FC<Props> = ({
                 <MetricTile label="Open flags" value={String(userDetail.stats.openFlags)} />
               </div>
 
-              <div style={styles.sectionBlock}>
-                <div style={styles.cardHeaderRow}>
+              <div className={s.sectionBlock}>
+                <div className={s.cardHeaderRow}>
                   <strong>Password and sessions</strong>
-                  <span style={styles.subtleSmall}>Current password is never visible.</span>
+                  <span className={s.subtleSmall}>Current password is never visible.</span>
                 </div>
-                <div style={styles.inlineControlsWrap}>
+                <div className={s.inlineControlsWrap}>
                   <input
-                    style={styles.input}
+                    className={s.input}
                     type="password"
                     placeholder="New password (min 8 chars)"
                     value={passwordDraft}
                     onChange={(e) => setPasswordDraft(e.target.value)}
                   />
                   <button
-                    style={styles.smallButton}
+                    className={s.smallButton}
                     disabled={passwordDraft.trim().length < 8 || actionBusy === 'password-reset'}
                     onClick={() => runUserAction('password-reset', async () => {
                       await apiService.resetAdminUserPassword(userDetail.user.id, passwordDraft.trim());
@@ -395,7 +400,7 @@ export const AdminPage: React.FC<Props> = ({
                     Reset password
                   </button>
                   <button
-                    style={styles.smallButton}
+                    className={s.smallButton}
                     disabled={actionBusy === 'revoke-sessions'}
                     onClick={() => runUserAction('revoke-sessions', async () => {
                       await apiService.revokeAdminUserSessions(userDetail.user.id);
@@ -404,7 +409,7 @@ export const AdminPage: React.FC<Props> = ({
                     Revoke all sessions
                   </button>
                   <button
-                    style={styles.smallDanger}
+                    className={s.smallDanger}
                     disabled={currentUserId === userDetail.user.id || actionBusy === 'delete-user'}
                     onClick={async () => {
                       try {
@@ -427,11 +432,11 @@ export const AdminPage: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div style={styles.sectionBlock}>
+              <div className={s.sectionBlock}>
                 <strong>Presence</strong>
-                <div style={styles.listBoxCompact}>
+                <div className={s.listBoxCompact}>
                   {userDetail.presence.map((entry) => (
-                    <div key={entry.socketId} style={styles.listRowColumn}>
+                    <div key={entry.socketId} className={s.listRowColumn}>
                       <small>socket {entry.socketId}</small>
                       <small>connected {new Date(entry.connectedAt).toLocaleString()}</small>
                     </div>
@@ -440,10 +445,10 @@ export const AdminPage: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div style={styles.sectionBlock}>
+              <div className={s.sectionBlock}>
                 <strong>Sessions ({userDetail.sessions.length})</strong>
-                <div style={styles.tableWrapShort}>
-                  <table style={styles.table}>
+                <div className={s.tableWrapShort}>
+                  <table className={s.table}>
                     <thead>
                       <tr>
                         <th>State</th>
@@ -462,7 +467,7 @@ export const AdminPage: React.FC<Props> = ({
                           <td>{new Date(session.lastSeenAt).toLocaleString()}</td>
                           <td>
                             <button
-                              style={styles.smallButton}
+                              className={s.smallButton}
                               disabled={actionBusy === `session-${session.id}`}
                               onClick={() => runUserAction(`session-${session.id}`, async () => {
                                 await apiService.revokeAdminUserSession(userDetail.user.id, session.id);
@@ -483,11 +488,11 @@ export const AdminPage: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div style={styles.sectionBlock}>
+              <div className={s.sectionBlock}>
                 <strong>Call history ({userDetail.callHistory.length})</strong>
-                <div style={styles.listBoxCompact}>
+                <div className={s.listBoxCompact}>
                   {userDetail.callHistory.map((call) => (
-                    <div key={call.id} style={styles.listRowColumn}>
+                    <div key={call.id} className={s.listRowColumn}>
                       <strong>{call.direction} | {call.counterpart.username}</strong>
                       <small>{call.status} | {new Date(call.createdAt).toLocaleString()} | {formatMetric(call.durationSec, 's')}</small>
                     </div>
@@ -496,11 +501,11 @@ export const AdminPage: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div style={styles.sectionBlock}>
+              <div className={s.sectionBlock}>
                 <strong>Security activity ({userDetail.securityActivity.length})</strong>
-                <div style={styles.listBoxCompact}>
+                <div className={s.listBoxCompact}>
                   {userDetail.securityActivity.map((event, idx) => (
-                    <div key={`${event.createdAt}-${idx}`} style={styles.listRowColumn}>
+                    <div key={`${event.createdAt}-${idx}`} className={s.listRowColumn}>
                       <strong>{event.action}</strong>
                       <small>{new Date(event.createdAt).toLocaleString()} | {event.ipAddress || '-'} | {event.deviceInfo || '-'}</small>
                     </div>
@@ -509,11 +514,11 @@ export const AdminPage: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div style={styles.sectionBlock}>
+              <div className={s.sectionBlock}>
                 <strong>Reports ({userDetail.reports.length})</strong>
-                <div style={styles.listBoxCompact}>
+                <div className={s.listBoxCompact}>
                   {userDetail.reports.map((report) => (
-                    <div key={report.id} style={styles.listRowColumn}>
+                    <div key={report.id} className={s.listRowColumn}>
                       <strong>{report.phoneNumber}</strong>
                       <small>{report.status || 'pending'} | {new Date(report.createdAt).toLocaleString()}</small>
                       {report.description && <small>{report.description}</small>}
@@ -524,19 +529,19 @@ export const AdminPage: React.FC<Props> = ({
               </div>
             </>
           ) : (
-            <div style={styles.subtle}>Select a user to inspect full details.</div>
+            <div className={s.subtle}>Select a user to inspect full details.</div>
           )}
         </section>
       </div>
 
-      <div style={styles.gridSecondary}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Platform sessions</h3>
-            <span style={styles.subtleSmall}>{adminSessions.length} recent sessions</span>
+      <div className={s.gridSecondary}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Platform sessions</h3>
+            <span className={s.subtleSmall}>{adminSessions.length} recent sessions</span>
           </div>
-          <div style={styles.tableWrapShort}>
-            <table style={styles.table}>
+          <div className={s.tableWrapShort}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>User</th>
@@ -563,13 +568,13 @@ export const AdminPage: React.FC<Props> = ({
           </div>
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Traffic logs</h3>
-            <span style={styles.subtleSmall}>{adminTrafficLogs.length} samples</span>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Traffic logs</h3>
+            <span className={s.subtleSmall}>{adminTrafficLogs.length} samples</span>
           </div>
-          <div style={styles.tableWrapShort}>
-            <table style={styles.table}>
+          <div className={s.tableWrapShort}>
+            <table className={s.table}>
               <thead>
                 <tr>
                   <th>When</th>
@@ -597,24 +602,24 @@ export const AdminPage: React.FC<Props> = ({
         </section>
       </div>
 
-      <div style={styles.gridSecondary}>
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Security and system logs</h3>
-            <span style={styles.subtleSmall}>{adminSecurityActivity.length} security events</span>
+      <div className={s.gridSecondary}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Security and system logs</h3>
+            <span className={s.subtleSmall}>{adminSecurityActivity.length} security events</span>
           </div>
-          <div style={styles.listBox}>
+          <div className={s.listBox}>
             {adminSecurityActivity.slice(0, 120).map((event, idx) => (
-              <div key={`${event.createdAt}-${event.userId}-${idx}`} style={styles.listRowColumn}>
+              <div key={`${event.createdAt}-${event.userId}-${idx}`} className={s.listRowColumn}>
                 <strong>{event.username}</strong>
                 <small>{event.action}</small>
                 <small>{new Date(event.createdAt).toLocaleString()} | {event.ipAddress || '-'} | {event.deviceInfo || '-'}</small>
               </div>
             ))}
           </div>
-          <div style={styles.listBoxCompact}>
+          <div className={s.listBoxCompact}>
             {adminLogs.slice(0, 40).map((log, idx) => (
-              <div key={`${idx}-${log.action || log.message}`} style={styles.listRowColumn}>
+              <div key={`${idx}-${log.action || log.message}`} className={s.listRowColumn}>
                 <strong>{log.action || log.message}</strong>
                 <small>{new Date(log.createdAt).toLocaleString()} | {log.level || log.type || 'info'}</small>
               </div>
@@ -622,32 +627,32 @@ export const AdminPage: React.FC<Props> = ({
           </div>
         </section>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeaderRow}>
-            <h3 style={styles.cardTitle}>Reports and blacklist</h3>
-            <span style={styles.subtleSmall}>Top numbers and global blocklist</span>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Reports and blacklist</h3>
+            <span className={s.subtleSmall}>Top numbers and global blocklist</span>
           </div>
-          <div style={styles.metricGrid}>
+          <div className={s.metricGrid}>
             {(adminReports?.topNumbers || []).slice(0, 4).map((item) => (
               <MetricTile key={item.phoneNumber} label={item.phoneNumber} value={String(item.count)} />
             ))}
             {!adminReports?.topNumbers?.length && <MetricTile label="Top numbers" value="-" />}
           </div>
 
-          <div style={styles.inlineControlsWrap}>
-            <input style={styles.input} placeholder="Phone number" value={blacklistPhone} onChange={(e) => setBlacklistPhone(e.target.value)} />
-            <input style={styles.input} placeholder="Reason" value={blacklistReason} onChange={(e) => setBlacklistReason(e.target.value)} />
-            <button style={styles.smallButton} onClick={onAddBlacklist}>Add to blacklist</button>
+          <div className={s.inlineControlsWrap}>
+            <input className={s.input} placeholder="Phone number" value={blacklistPhone} onChange={(e) => setBlacklistPhone(e.target.value)} />
+            <input className={s.input} placeholder="Reason" value={blacklistReason} onChange={(e) => setBlacklistReason(e.target.value)} />
+            <button className={s.smallButton} onClick={onAddBlacklist}>Add to blacklist</button>
           </div>
 
-          <div style={styles.listBoxCompact}>
+          <div className={s.listBoxCompact}>
             {blacklist.map((item) => (
-              <div key={item.id} style={styles.listItemBetween}>
-                <div style={styles.listRowColumn}>
+              <div key={item.id} className={s.listItemBetween}>
+                <div className={s.listRowColumn}>
                   <strong>{item.phoneNumber}</strong>
                   <small>{item.reason || '-'} | {item.source || '-'}</small>
                 </div>
-                <button style={styles.smallDanger} onClick={() => onDeleteBlacklist(item.id)}>Delete</button>
+                <button className={s.smallDanger} onClick={() => onDeleteBlacklist(item.id)}>Delete</button>
               </div>
             ))}
             {!blacklist.length && <small>No blacklist entries</small>}
@@ -659,17 +664,17 @@ export const AdminPage: React.FC<Props> = ({
 };
 
 const SummaryCard: React.FC<{ label: string; value: string; hint?: string }> = ({ label, value, hint }) => (
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryLabel}>{label}</div>
-    <div style={styles.summaryValue}>{value}</div>
-    <div style={styles.subtleSmall}>{hint || '\u00a0'}</div>
+  <div className={s.summaryCard}>
+    <div className={s.summaryLabel}>{label}</div>
+    <div className={s.summaryValue}>{value}</div>
+    <div className={s.subtleSmall}>{hint || '\u00a0'}</div>
   </div>
 );
 
 const MetricTile: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div style={styles.metricCard}>
-    <div style={styles.summaryLabel}>{label}</div>
-    <div style={styles.metricValue}>{value}</div>
+  <div className={s.metricCard}>
+    <div className={s.summaryLabel}>{label}</div>
+    <div className={s.metricValue}>{value}</div>
   </div>
 );
 
@@ -684,46 +689,3 @@ function formatDuration(totalSec?: number) {
   const sec = value % 60;
   return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 16 },
-  pageHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
-  headerActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.4, fontSize: 11, color: 'var(--muted)' },
-  heading: { margin: '6px 0 4px', fontSize: 24 },
-  subtle: { fontSize: 13, color: 'var(--muted)' },
-  subtleSmall: { fontSize: 12, color: 'var(--muted)' },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 },
-  gridMain: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 },
-  gridSecondary: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 },
-  card: { background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 20, padding: 16, boxShadow: 'var(--shadow-soft)', display: 'flex', flexDirection: 'column', gap: 12 },
-  cardHeaderRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  cardTitle: { margin: 0, fontSize: 18 },
-  summaryCard: { background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 18, padding: 16, boxShadow: 'var(--shadow-soft)' },
-  summaryLabel: { color: 'var(--muted)', fontSize: 12, marginBottom: 6 },
-  summaryValue: { fontSize: 28, fontWeight: 900 },
-  tableWrap: { overflowX: 'auto' },
-  tableWrapTall: { overflow: 'auto', maxHeight: 680 },
-  tableWrapShort: { overflow: 'auto', maxHeight: 360 },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 13 },
-  selectedRow: { background: 'rgba(12,108,255,0.08)' },
-  inlineControls: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  inlineControlsWrap: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  input: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '8px 10px', minWidth: 180 },
-  primaryButton: { borderRadius: 12, border: 'none', background: 'var(--primary)', color: '#fff', padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  secondaryButton: { borderRadius: 12, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '10px 14px', fontWeight: 800, cursor: 'pointer' },
-  smallButton: { borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel-bg2)', color: 'var(--text)', padding: '6px 10px', cursor: 'pointer' },
-  smallDanger: { borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.12)', color: '#ef4444', padding: '6px 10px', cursor: 'pointer' },
-  metricGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 },
-  metricCard: { background: 'var(--panel-bg2)', borderRadius: 14, padding: 12, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 },
-  metricValue: { fontSize: 20, fontWeight: 800 },
-  detailHero: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
-  detailTitle: { fontSize: 20, fontWeight: 900 },
-  sectionBlock: { display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
-  listBox: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto', paddingRight: 4 },
-  listBoxCompact: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 4 },
-  listRowColumn: { display: 'flex', flexDirection: 'column', gap: 4, padding: 10, borderRadius: 12, background: 'var(--panel-bg2)' },
-  listItemBetween: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12, background: 'var(--panel-bg2)' },
-  errorBox: { borderRadius: 12, padding: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' },
-  empty: { padding: 20, borderRadius: 16, background: 'var(--panel-bg)', border: '1px solid var(--border)' },
-};

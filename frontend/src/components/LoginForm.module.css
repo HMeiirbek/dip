@@ -1,0 +1,136 @@
+.container {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.card {
+  width: min(420px, 100%);
+  background: var(--panel-bg);
+  border-radius: 18px;
+  box-shadow: var(--shadow-strong);
+  border: 1px solid var(--border);
+  padding: 28px;
+}
+
+.title {
+  text-align: center;
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: clamp(26px, 2.4vw + 16px, 34px);
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--muted);
+  margin-bottom: 22px;
+  font-size: 14px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.input {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  background: var(--panel-bg2);
+  color: var(--text);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  outline: none;
+}
+
+.input:disabled {
+  opacity: 0.75;
+}
+
+.primaryButton {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--success) 92%, var(--primary)) 100%);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  box-shadow: 0 10px 30px rgba(88, 101, 242, 0.22);
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primaryButton:not(:disabled):hover {
+  box-shadow: 0 14px 44px rgba(88, 101, 242, 0.28);
+}
+
+.primaryButton:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.toggleAuth {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.toggleText {
+  margin-right: 6px;
+}
+
+.toggleButton {
+  min-height: 44px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 800;
+  text-decoration: underline;
+  font-size: 14px;
+  border-radius: 10px;
+  transition: background-color 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+
+.toggleButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.toggleButton:not(:disabled):hover {
+  background: rgba(88, 101, 242, 0.10);
+}
+
+@media (max-width: 420px) {
+  .card {
+    padding: 18px;
+    border-radius: 16px;
+  }
+}
+

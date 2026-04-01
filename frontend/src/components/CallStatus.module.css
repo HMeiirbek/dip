@@ -1,0 +1,207 @@
+.idle {
+  text-align: center;
+  padding: 18px;
+  color: var(--muted);
+  background: var(--panel-bg);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  font-style: italic;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.cardBase {
+  width: min(520px, 100%);
+  background: var(--panel-bg);
+  padding: 22px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.incomingCard {
+  composes: cardBase;
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--success) 92%, var(--primary)) 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: var(--shadow-strong);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.incomingTitle {
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+
+.incomingFrom {
+  font-size: 14px;
+  margin-bottom: 16px;
+  opacity: 0.92;
+  word-break: break-word;
+}
+
+.callingCard {
+  composes: cardBase;
+}
+
+.callingAnimation {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.callingText {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(148, 163, 184, 0.35);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+.activeCard {
+  composes: cardBase;
+  border-top: 4px solid var(--success);
+}
+
+.activeIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.activeUser {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.activeMeta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.endedCard {
+  composes: cardBase;
+}
+
+.endedIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  color: var(--success);
+}
+
+.endedText {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.errorCard {
+  composes: cardBase;
+  border-top: 4px solid var(--danger);
+}
+
+.errorIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.errorText {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 180ms ease, background-color 180ms ease, opacity 180ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.acceptButton {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.rejectButton {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.endButton {
+  background: rgba(237, 66, 69, 0.12);
+  border-color: rgba(237, 66, 69, 0.28);
+  color: var(--danger);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 420px) {
+  .cardBase {
+    padding: 18px;
+    border-radius: 14px;
+  }
+}
+
