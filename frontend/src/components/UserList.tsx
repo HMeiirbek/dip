@@ -20,6 +20,7 @@ export const UserList: React.FC<UserListProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
 
   const loadUsers = useCallback(async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -59,10 +60,17 @@ export const UserList: React.FC<UserListProps> = ({
 
     socketService.onPresenceChanged(handlePresenceChange);
 
+    pollTimerRef.current = window.setInterval(() => {
+      loadUsers({ silent: true });
+    }, 10000);
+
     return () => {
       socketService.offPresenceChanged(handlePresenceChange);
       if (refreshTimerRef.current !== null) {
         window.clearTimeout(refreshTimerRef.current);
+      }
+      if (pollTimerRef.current !== null) {
+        window.clearInterval(pollTimerRef.current);
       }
     };
   }, [loadUsers]);
@@ -70,7 +78,7 @@ export const UserList: React.FC<UserListProps> = ({
   const otherUsers = useMemo(
     () =>
       users
-        .filter((user) => user.id !== currentUserId && user.online)
+        .filter((user) => user.id !== currentUserId && isUserOnline(user))
         .sort((a, b) => a.username.localeCompare(b.username)),
     [users, currentUserId],
   );
@@ -178,8 +186,22 @@ function isSameUser(a: User, b: User) {
     a.role === b.role &&
     a.createdAt === b.createdAt &&
     a.verified === b.verified &&
-    a.online === b.online
+    isUserOnline(a) === isUserOnline(b)
   );
+}
+
+function isUserOnline(user: User & Record<string, unknown>) {
+  const normalized = user as User & {
+    isOnline?: boolean | string | number;
+    status?: string;
+  };
+  if (typeof normalized.online === 'boolean') return normalized.online;
+  if (typeof normalized.online === 'string') return normalized.online.toLowerCase() === 'true';
+  if (typeof normalized.isOnline === 'boolean') return normalized.isOnline;
+  if (typeof normalized.isOnline === 'string') return normalized.isOnline.toLowerCase() === 'true';
+  if (typeof normalized.isOnline === 'number') return normalized.isOnline > 0;
+  if (typeof normalized.status === 'string') return normalized.status.toLowerCase() === 'online';
+  return false;
 }
 
 const styles = {
