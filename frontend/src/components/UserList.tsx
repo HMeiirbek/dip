@@ -190,13 +190,15 @@ function isSameUser(a: User, b: User) {
   );
 }
 
-function isUserOnline(user: User & Record<string, unknown>) {
-  const normalized = user as User & {
-    isOnline?: boolean | string | number;
-    status?: string;
+function isUserOnline(user: User) {
+  const normalized = user as unknown as {
+    online?: unknown;
+    isOnline?: unknown;
+    status?: unknown;
   };
   if (typeof normalized.online === 'boolean') return normalized.online;
   if (typeof normalized.online === 'string') return normalized.online.toLowerCase() === 'true';
+  if (typeof normalized.online === 'number') return normalized.online > 0;
   if (typeof normalized.isOnline === 'boolean') return normalized.isOnline;
   if (typeof normalized.isOnline === 'string') return normalized.isOnline.toLowerCase() === 'true';
   if (typeof normalized.isOnline === 'number') return normalized.isOnline > 0;
