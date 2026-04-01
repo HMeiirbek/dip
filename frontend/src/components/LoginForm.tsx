@@ -40,9 +40,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
       const status = error.response?.status;
       const errorMessage =
         status === 401
-          ? 'Authentication failed'
+          ? 'Invalid username or password'
           : status === 429
           ? 'Too many login attempts. Please try again later.'
+          : status === 502 || status === 503 || status === 504
+          ? 'Server is temporarily unavailable. Please try again in a moment.'
           : error.response?.data?.message ||
             error.message ||
             'Authentication failed';
