@@ -60,6 +60,13 @@ export const CallStatus: React.FC<CallStatusProps> = ({
           <div className={s.callingAnimation}>📞</div>
           <div className={s.callingText}>Calling {remoteUsername}...</div>
           <div className={s.spinner} />
+          {onEnd && (
+            <div className={s.buttonGroup} style={{ marginTop: 14 }}>
+              <button onClick={onEnd} className={[s.button, s.endButton].join(' ')}>
+                ✕ End Call
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
