@@ -75,13 +75,13 @@ export const UserList: React.FC<UserListProps> = ({
     };
   }, [loadUsers]);
 
-  const otherUsers = useMemo(
-    () =>
-      users
-        .filter((user) => user.id !== currentUserId && isUserOnline(user))
-        .sort((a, b) => a.username.localeCompare(b.username)),
-    [users, currentUserId],
-  );
+  const { otherUsers, onlineCount } = useMemo(() => {
+    const others = users
+      .filter((user) => user.id !== currentUserId)
+      .sort((a, b) => a.username.localeCompare(b.username));
+    const online = others.filter((user) => isUserOnline(user)).length;
+    return { otherUsers: others, onlineCount: online };
+  }, [users, currentUserId]);
 
   if (loading) {
     return <div className={s.container}>Loading users...</div>;
@@ -104,12 +104,14 @@ export const UserList: React.FC<UserListProps> = ({
   return (
     <div className={s.container}>
       <div className={s.headerRow}>
-        <h2 className={s.title}>Users Online ({otherUsers.length})</h2>
+        <h2 className={s.title}>
+          Users ({onlineCount} online / {otherUsers.length})
+        </h2>
         <div className={s.headerMeta}>{refreshing ? 'Updating…' : 'Live via socket presence'}</div>
       </div>
 
       {otherUsers.length === 0 ? (
-        <div className={s.empty}>No other online users right now</div>
+        <div className={s.empty}>No other users yet</div>
       ) : (
         <div className={s.list}>
           {otherUsers.map((user) => (
@@ -141,7 +143,7 @@ const UserRow = React.memo(
         <span className={s.userAvatar} aria-hidden="true">👤</span>
         <div className={s.userMeta}>
           <span className={s.username}>{user.username}</span>
-          <small className={s.onlineMeta}>online now</small>
+          <small className={s.onlineMeta}>{isUserOnline(user) ? 'online' : 'offline'}</small>
         </div>
       </div>
       <CallButton
