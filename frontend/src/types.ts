@@ -2,10 +2,70 @@
 export interface User {
   id: string;
   username: string;
+  name?: string | null;
+  avatarUrl?: string | null;
   role?: 'user' | 'admin' | 'moderator';
   verified?: boolean;
   createdAt?: string;
   online?: boolean;
+}
+
+export type ChatType = 'PRIVATE' | 'GROUP';
+
+export interface ChatListItem {
+  id: string;
+  type: ChatType;
+  title: string | null;
+  /** Present for GROUP chats */
+  ownerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  members: User[];
+  lastMessage: null | {
+    id: string;
+    content: string;
+    createdAt: string;
+    senderId: string;
+  };
+  unreadCount: number;
+}
+
+export interface AccountNotification {
+  id: string;
+  userId: string;
+  type: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface SupportRequestAdmin {
+  id: string;
+  userId: string;
+  topic: string;
+  text: string;
+  status: string;
+  createdAt: string;
+  user?: { username: string };
+}
+
+export interface ChatMessageItem {
+  id: string;
+  chatId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  sender?: User;
+}
+
+export type PrivacyWriteMode = 'EVERYONE' | 'CONTACTS_ONLY' | 'NOBODY';
+
+export interface PrivacySettings {
+  id: string;
+  allowMessagesFrom: PrivacyWriteMode;
+  loginNotifications: boolean;
 }
 
 export interface AuthResponse {

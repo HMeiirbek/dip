@@ -14,6 +14,11 @@ import {
   AdminTrafficLog,
   AdminUserDetail,
   ModeratorPresenceSnapshot,
+  ChatListItem,
+  ChatMessageItem,
+  PrivacySettings,
+  AccountNotification,
+  SupportRequestAdmin,
 } from '../types';
 
 const apiBaseUrlRaw = process.env.REACT_APP_API_URL?.trim();
@@ -185,6 +190,177 @@ class ApiService {
 
   async getUser(id: string): Promise<User> {
     const response = await this.api.get<User>(`/users/${id}`);
+    return response.data;
+  }
+
+  async getMyProfile(): Promise<User> {
+    const response = await this.api.get<User>('/users/me');
+    return response.data;
+  }
+
+  async updateMyProfile(input: { name?: string; username?: string; avatarUrl?: string }): Promise<User> {
+    const response = await this.api.put<User>('/users/me', input);
+    return response.data;
+  }
+
+  async uploadMyAvatar(file: File): Promise<User> {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await this.api.put<User>('/users/me/avatar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async changeMyPassword(input: { oldPassword: string; newPassword: string }): Promise<{ success: boolean }> {
+    const response = await this.api.put<{ success: boolean }>('/users/me/password', input);
+    return response.data;
+  }
+
+  async getMyPrivacy(): Promise<PrivacySettings> {
+    const response = await this.api.get<PrivacySettings>('/users/me/privacy');
+    return response.data;
+  }
+
+  async updateMyPrivacy(input: { allowMessagesFrom: string }): Promise<PrivacySettings> {
+    const response = await this.api.put<PrivacySettings>('/users/me/privacy', input);
+    return response.data;
+  }
+
+  async getMyBlacklist(): Promise<any[]> {
+    const response = await this.api.get<any[]>('/users/me/blacklist');
+    return response.data;
+  }
+
+  async addToMyBlacklist(blockedUserId: string): Promise<any> {
+    const response = await this.api.post('/users/me/blacklist', { blockedUserId });
+    return response.data;
+  }
+
+  async removeFromMyBlacklist(blockedUserId: string): Promise<{ success: boolean }> {
+    const response = await this.api.delete<{ success: boolean }>(`/users/me/blacklist/${blockedUserId}`);
+    return response.data;
+  }
+
+  async getMyContacts(): Promise<
+    Array<{
+      id: string;
+      contactUserId: string;
+      createdAt: string;
+      contactUser: { id: string; username: string; name?: string | null; avatarUrl?: string | null };
+    }>
+  > {
+    const response = await this.api.get('/users/me/contacts');
+    return response.data;
+  }
+
+  async addMyContact(contactUserId: string): Promise<{ id: string; contactUserId: string; createdAt: string }> {
+    const response = await this.api.post('/users/me/contacts', { contactUserId });
+    return response.data;
+  }
+
+  async removeMyContact(contactUserId: string): Promise<{ success: boolean }> {
+    const response = await this.api.delete<{ success: boolean }>(`/users/me/contacts/${contactUserId}`);
+    return response.data;
+  }
+
+  async requestDeleteAccountCode(): Promise<{
+    success: boolean;
+    code?: string;
+    expiresInSec?: number;
+    delivery?: string;
+  }> {
+    const response = await this.api.post('/users/me/delete-account-code', {});
+    return response.data;
+  }
+
+  async deleteMyAccount(input: {
+    password?: string;
+    confirmationCode?: string;
+  }): Promise<{ success: boolean; deletedAt?: string }> {
+    const response = await this.api.delete<{ success: boolean; deletedAt?: string }>('/users/me', { data: input });
+    return response.data;
+  }
+
+  async exportMyAccount(includeMessages = false): Promise<any> {
+    const response = await this.api.get('/users/me/export', {
+      params: { includeMessages },
+    });
+    return response.data;
+  }
+
+  // Support endpoints
+  async sendSupportFeedback(input: { topic: string; text: string }): Promise<any> {
+    const response = await this.api.post('/support/feedback', input);
+    return response.data;
+  }
+
+  async getSupportPage(slug: 'faq' | 'terms' | 'privacy'): Promise<any> {
+    const response = await this.api.get(`/support/pages/${slug}`);
+    return response.data;
+  }
+
+  // Chats endpoints
+  async listChats(): Promise<ChatListItem[]> {
+    const response = await this.api.get<ChatListItem[]>('/chats');
+    return response.data;
+  }
+
+  async searchChats(q: string): Promise<{ users: User[]; groups: any[] }> {
+    const response = await this.api.get('/chats/search', { params: { q } });
+    return response.data;
+  }
+
+  async createChat(input: { type: 'PRIVATE' | 'GROUP'; title?: string; memberIds: string[] }): Promise<any> {
+    const response = await this.api.post('/chats', input);
+    return response.data;
+  }
+
+  async getChatMessages(chatId: string): Promise<ChatMessageItem[]> {
+    const response = await this.api.get<ChatMessageItem[]>(`/chats/${chatId}/messages`);
+    return response.data;
+  }
+
+  async sendChatMessage(chatId: string, content: string): Promise<ChatMessageItem> {
+    const response = await this.api.post<ChatMessageItem>(`/chats/${chatId}/messages`, { content });
+    return response.data;
+  }
+
+  async markChatRead(chatId: string, messageId: string): Promise<{ success: boolean }> {
+    const response = await this.api.put<{ success: boolean }>(`/chats/${chatId}/read`, { messageId });
+    return response.data;
+  }
+
+  async addChatMember(chatId: string, memberId: string): Promise<{ success: boolean; chatId: string; memberId: string }> {
+    const response = await this.api.post(`/chats/${chatId}/members`, { memberId });
+    return response.data;
+  }
+
+  async removeChatMember(chatId: string, userId: string): Promise<{ success: boolean; chatId: string; removedUserId: string }> {
+    const response = await this.api.delete(`/chats/${chatId}/members/${userId}`);
+    return response.data;
+  }
+
+  async listNotifications(): Promise<AccountNotification[]> {
+    const response = await this.api.get<AccountNotification[]>('/notifications');
+    return response.data;
+  }
+
+  async markNotificationRead(id: string): Promise<{ success: boolean }> {
+    const response = await this.api.put<{ success: boolean }>(`/notifications/${id}/read`, {});
+    return response.data;
+  }
+
+  async getAdminSupportRequests(): Promise<SupportRequestAdmin[]> {
+    const response = await this.api.get<SupportRequestAdmin[]>('/support/admin/requests');
+    return response.data;
+  }
+
+  async updateSupportRequestStatus(
+    id: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed',
+  ): Promise<SupportRequestAdmin> {
+    const response = await this.api.patch<SupportRequestAdmin>(`/support/admin/requests/${id}`, { status });
     return response.data;
   }
 

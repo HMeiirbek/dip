@@ -22,7 +22,9 @@ import {
   RiskStats,
   SecurityActivityItem,
   SecuritySession,
+  SupportRequestAdmin,
   User,
+  AccountNotification,
 } from '../types';
 
 type NotifyFn = (message: string) => void;
@@ -39,6 +41,7 @@ export function useControlCenterData(params: {
 
   const [securitySessions, setSecuritySessions] = useState<SecuritySession[]>([]);
   const [securityActivity, setSecurityActivity] = useState<SecurityActivityItem[]>([]);
+  const [accountNotifications, setAccountNotifications] = useState<AccountNotification[]>([]);
   const [verifyCode, setVerifyCode] = useState('');
   const [resetIdentifier, setResetIdentifier] = useState('');
   const [resetCode, setResetCode] = useState('');
@@ -64,6 +67,7 @@ export function useControlCenterData(params: {
   const [mlStatus, setMlStatus] = useState<MlStatus | null>(null);
   const [mlMetrics, setMlMetrics] = useState<MlMetrics | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
+  const [supportRequests, setSupportRequests] = useState<SupportRequestAdmin[]>([]);
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
   const [blacklistPhone, setBlacklistPhone] = useState('');
   const [blacklistReason, setBlacklistReason] = useState('');
@@ -81,12 +85,23 @@ export function useControlCenterData(params: {
 
   const loadSecurityData = async () => {
     try {
-      const [sessions, activity] = await Promise.all([
+      const [sessions, activity, notifications] = await Promise.all([
         apiService.getSessions(),
         apiService.getSecurityActivity(),
+        apiService.listNotifications(),
       ]);
       setSecuritySessions(sessions || []);
       setSecurityActivity(activity || []);
+      setAccountNotifications(notifications || []);
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
+    }
+  };
+
+  const markAccountNotificationRead = async (id: string) => {
+    try {
+      await apiService.markNotificationRead(id);
+      setAccountNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch (e) {
       notifyError(getAxiosErrorMessage(e));
     }
@@ -184,7 +199,7 @@ export function useControlCenterData(params: {
     if (!isAdmin) return;
     setAdminLoading(true);
     try {
-      const [dashboard, analytics, slaSummary, reports, logs, users, mlS, mlM, bl, sessions, securityActivity, trafficLogs] = await Promise.all([
+      const [dashboard, analytics, slaSummary, reports, logs, users, mlS, mlM, bl, sessions, securityActivity, trafficLogs, support] = await Promise.all([
         apiService.getAdminDashboard(),
         apiService.getAdminAnalytics(),
         apiService.getAdminSlaSummary(),
@@ -197,6 +212,7 @@ export function useControlCenterData(params: {
         apiService.getAdminSessions(),
         apiService.getAdminSecurityActivity(),
         apiService.getAdminTrafficLogs(),
+        apiService.getAdminSupportRequests(),
       ]);
       setAdminDashboard(dashboard);
       setAdminAnalytics(analytics);
@@ -210,10 +226,23 @@ export function useControlCenterData(params: {
       setAdminSessions(sessions || []);
       setAdminSecurityActivity(securityActivity || []);
       setAdminTrafficLogs(trafficLogs || []);
+      setSupportRequests(support || []);
     } catch (e) {
       notifyError(getAxiosErrorMessage(e));
     } finally {
       setAdminLoading(false);
+    }
+  };
+
+  const updateSupportRequestStatus = async (
+    id: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed',
+  ) => {
+    try {
+      await apiService.updateSupportRequestStatus(id, status);
+      await loadAdminData();
+    } catch (e) {
+      notifyError(getAxiosErrorMessage(e));
     }
   };
 
@@ -361,6 +390,7 @@ export function useControlCenterData(params: {
     security: {
       securitySessions,
       securityActivity,
+      accountNotifications,
       verifyCode,
       setVerifyCode,
       resetIdentifier,
@@ -375,6 +405,7 @@ export function useControlCenterData(params: {
       handleForgotPassword,
       handleResetPassword,
       terminateSession,
+      markAccountNotificationRead,
     },
     risk: {
       riskAnalysis,
@@ -418,6 +449,7 @@ export function useControlCenterData(params: {
       resolveAllFlagsForCall,
     },
     admin: {
+      supportRequests,
       adminDashboard,
       adminAnalytics,
       adminSlaSummary,
@@ -441,6 +473,7 @@ export function useControlCenterData(params: {
       deleteBlacklist,
       updateRole,
       deleteUser,
+      updateSupportRequestStatus,
     },
     meta: {
       currentUser,

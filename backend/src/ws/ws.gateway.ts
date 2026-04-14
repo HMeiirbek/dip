@@ -391,4 +391,13 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       at: new Date().toISOString(),
     });
   }
+
+  emitChatMessage(userIds: string[], payload: { chatId: string; message: unknown }) {
+    for (const userId of userIds) {
+      const socketId = this.presence.getSocketIdByUserId(userId);
+      if (socketId) {
+        this.server.to(socketId).emit('chat:message', payload);
+      }
+    }
+  }
 }

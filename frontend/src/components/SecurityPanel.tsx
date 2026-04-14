@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { SecurityActivityItem, SecuritySession } from '../types';
+import { AccountNotification, SecurityActivityItem, SecuritySession } from '../types';
 import s from './SecurityPanel.module.css';
 
 interface SecurityPanelProps {
   securitySessions: SecuritySession[];
   securityActivity: SecurityActivityItem[];
+  accountNotifications: AccountNotification[];
   verifyCode: string;
   setVerifyCode: React.Dispatch<React.SetStateAction<string>>;
   resetIdentifier: string;
@@ -19,11 +20,13 @@ interface SecurityPanelProps {
   onTerminateSession: (id: string) => Promise<void> | void;
   onRequestResetCode: () => Promise<void> | void;
   onResetPassword: () => Promise<void> | void;
+  onMarkNotificationRead: (id: string) => Promise<void> | void;
 }
 
 export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   securitySessions,
   securityActivity,
+  accountNotifications,
   verifyCode,
   setVerifyCode,
   resetIdentifier,
@@ -38,6 +41,7 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
   onTerminateSession,
   onRequestResetCode,
   onResetPassword,
+  onMarkNotificationRead,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
   const activeSessions = securitySessions.filter((session) => session.active);
@@ -108,6 +112,28 @@ export const SecurityPanel: React.FC<SecurityPanelProps> = ({
               <small>{new Date(a.at).toLocaleString()} | {a.ipAddress || 'n/a'}</small>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className={s.card}>
+        <h3 className={s.cardTitle}>Account notifications</h3>
+        <p className={s.subtleSmall}>Security and system messages (e.g. new sign-in).</p>
+        <div className={s.listBox}>
+          {accountNotifications.slice(0, 40).map((n) => (
+            <div key={n.id} className={[s.listItemColumn, n.isRead ? s.notifRead : s.notifUnread].join(' ')}>
+              <div className={s.notifRow}>
+                <span className={s.notifType}>{n.type}</span>
+                {!n.isRead ? (
+                  <button type="button" className={s.smallLink} onClick={() => onMarkNotificationRead(n.id)}>
+                    Mark read
+                  </button>
+                ) : null}
+              </div>
+              <div className={s.notifMessage}>{n.message}</div>
+              <small>{new Date(n.createdAt).toLocaleString()}</small>
+            </div>
+          ))}
+          {!accountNotifications.length ? <div className={s.emptyState}>No notifications</div> : null}
         </div>
       </div>
     </div>

@@ -42,6 +42,19 @@ export class CallsService {
       throw new BadRequestException('Cannot call yourself');
     }
 
+    const userBlock = await this.prisma.userBlacklist.findFirst({
+      where: {
+        OR: [
+          { userId: callerId, blockedUserId: calleeId },
+          { userId: calleeId, blockedUserId: callerId },
+        ],
+      },
+      select: { id: true },
+    });
+    if (userBlock) {
+      throw new ForbiddenException('Calls are not allowed between blocked users');
+    }
+
     const now = new Date();
 
     // Cleanup stale calls for this pair before checking active state

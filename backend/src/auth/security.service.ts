@@ -531,7 +531,17 @@ export class SecurityService {
     );
   }
 
-  private async storeCode(userId: string, kind: 'verify' | 'reset', code: string) {
+  async issueDeleteAccountCode(userId: string) {
+    const code = this.generateCode();
+    await this.storeCode(userId, 'delete_account', code);
+    return code;
+  }
+
+  async checkDeleteAccountCode(userId: string, code: string) {
+    return this.consumeCode(userId, 'delete_account', code);
+  }
+
+  private async storeCode(userId: string, kind: 'verify' | 'reset' | 'delete_account', code: string) {
     await this.ensureSecurityRuntimeTables();
     await this.prisma.$executeRawUnsafe(
       `UPDATE security_codes
@@ -552,7 +562,7 @@ export class SecurityService {
     );
   }
 
-  private async consumeCode(userId: string, kind: 'verify' | 'reset', code: string) {
+  private async consumeCode(userId: string, kind: 'verify' | 'reset' | 'delete_account', code: string) {
     await this.ensureSecurityRuntimeTables();
     const codeHash = this.hash(code);
     const rows = await this.prisma.$queryRawUnsafe<Array<{ id: string; expires_at: Date; consumed_at: Date | null }>>(

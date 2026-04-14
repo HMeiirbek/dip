@@ -18,6 +18,7 @@ import {
   MlStatus,
   ModeratorOverview,
   ModeratorPresenceSnapshot,
+  SupportRequestAdmin,
 } from '../types';
 
 type Props = {
@@ -50,6 +51,11 @@ type Props = {
   onUpdateUserRole: (id: string, role: 'user' | 'admin' | 'moderator') => Promise<void> | void;
   onDeleteUser: (id: string) => Promise<void> | void;
   onForceEndCall: (id: string) => Promise<void> | void;
+  supportRequests: SupportRequestAdmin[];
+  onUpdateSupportRequestStatus: (
+    id: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed',
+  ) => Promise<void> | void;
 };
 
 export const AdminPage: React.FC<Props> = ({
@@ -82,6 +88,8 @@ export const AdminPage: React.FC<Props> = ({
   onUpdateUserRole,
   onDeleteUser,
   onForceEndCall,
+  supportRequests,
+  onUpdateSupportRequestStatus,
 }) => {
   const [userQuery, setUserQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -188,6 +196,58 @@ export const AdminPage: React.FC<Props> = ({
         <SummaryCard label="RTT ok 24h" value={formatMetric(adminSlaSummary?.quality24h.rttLe200Pct, '%')} hint={`samples ${adminSlaSummary?.quality24h.samples ?? 0}`} />
         <SummaryCard label="ML" value={mlStatus?.active ? (mlStatus.model?.version || 'active') : 'inactive'} hint={`acc ${formatMetric(mlMetrics?.accuracy, '%')}`} />
       </div>
+
+      <section className={s.card}>
+        <div className={s.cardHeaderRow}>
+          <h3 className={s.cardTitle}>Support requests</h3>
+          <span className={s.subtleSmall}>{supportRequests.length} total</span>
+        </div>
+        <div className={s.tableWrapShort}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                <th>Topic</th>
+                <th>Preview</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {supportRequests.map((r) => (
+                <tr key={r.id}>
+                  <td>{new Date(r.createdAt).toLocaleString()}</td>
+                  <td>{r.user?.username || r.userId.slice(0, 8)}</td>
+                  <td>{r.topic}</td>
+                  <td className={s.supportPreviewCell}>{r.text.length > 80 ? `${r.text.slice(0, 80)}…` : r.text}</td>
+                  <td>
+                    <select
+                      className={s.select}
+                      value={r.status}
+                      onChange={(e) =>
+                        onUpdateSupportRequestStatus(
+                          r.id,
+                          e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed',
+                        )
+                      }
+                    >
+                      <option value="open">open</option>
+                      <option value="in_progress">in_progress</option>
+                      <option value="resolved">resolved</option>
+                      <option value="closed">closed</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {!supportRequests.length ? (
+                <tr>
+                  <td colSpan={5}>No support requests yet</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className={s.gridSecondary}>
         <section className={s.card}>

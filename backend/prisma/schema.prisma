@@ -7,6 +7,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum ChatType {
+  PRIVATE
+  GROUP
+}
+
+enum PrivacyWriteMode {
+  EVERYONE
+  CONTACTS_ONLY
+  NOBODY
+}
+
 model User {
   id           String   @id @default(uuid())
   username     String   @unique
@@ -16,6 +27,11 @@ model User {
   role         String   @default("user") // user | admin | moderator
   trustScore   Int      @default(0)
   isVerified   Boolean  @default(false)
+  name         String?
+  avatarUrl    String?
+  loginNotifications Boolean @default(true)
+  allowMessagesFrom  PrivacyWriteMode @default(EVERYONE)
+  deletedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -27,6 +43,15 @@ model User {
   securityLogs   SecurityLog[]
   sentMessages   Message[]      @relation("MessageSenderRelation")
   receivedMessages Message[]    @relation("MessageReceiverRelation")
+  chatMemberships ChatMember[]
+  sentChatMessages ChatMessage[] @relation("ChatMessageSender")
+  ownedChats      Chat[]         @relation("ChatOwner")
+  blockedUsers    UserBlacklist[] @relation("UserBlocks")
+  blockedByUsers  UserBlacklist[] @relation("BlockedByUsers")
+
+  supportRequests SupportRequest[]
+  contacts        Contact[] @relation("UserContacts")
+  inContacts      Contact[] @relation("UserInContacts")
 }
 
 model Call {
@@ -108,6 +133,97 @@ model Message {
   createdAt  DateTime @default(now())
   sender     User     @relation("MessageSenderRelation", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("MessageReceiverRelation", fields: [receiverId], references: [id], onDelete: Cascade)
+}
+
+model Chat {
+  id        String   @id @default(uuid())
+  type      ChatType
+  title     String?
+  ownerId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner     User?        @relation("ChatOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members   ChatMember[]
+  messages  ChatMessage[]
+
+  @@index([type], name: "chat_type_idx")
+  @@index([createdAt], name: "chat_created_at_idx")
+}
+
+model ChatMember {
+  id                String   @id @default(uuid())
+  userId            String
+  chatId            String
+  joinedAt          DateTime @default(now())
+  lastReadMessageId String?
+  muted             Boolean  @default(false)
+
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat              Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatId], name: "chat_member_user_chat_unique")
+  @@index([chatId], name: "chat_member_chat_id_idx")
+  @@index([userId], name: "chat_member_user_id_idx")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  chat      Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt], name: "chat_message_chat_created_idx")
+  @@index([senderId], name: "chat_message_sender_id_idx")
+}
+
+model UserBlacklist {
+  id            String   @id @default(uuid())
+  userId        String
+  blockedUserId String
+  createdAt     DateTime @default(now())
+
+  user          User @relation("UserBlocks", fields: [userId], references: [id], onDelete: Cascade)
+  blockedUser   User @relation("BlockedByUsers", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, blockedUserId], name: "user_blacklist_user_blocked_unique")
+  @@index([userId], name: "user_blacklist_user_id_idx")
+  @@index([blockedUserId], name: "user_blacklist_blocked_user_id_idx")
+}
+
+model SupportRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  topic     String
+  text      String
+  status    String   @default("open") // open | in_progress | resolved | closed
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "support_request_user_id_idx")
+  @@index([status], name: "support_request_status_idx")
+  @@index([createdAt], name: "support_request_created_at_idx")
+}
+
+model Contact {
+  id            String   @id @default(uuid())
+  userId        String
+  contactUserId String
+  createdAt     DateTime @default(now())
+
+  user          User @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+  contactUser   User @relation("UserInContacts", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactUserId], name: "contact_user_contact_unique")
+  @@index([userId], name: "contact_user_id_idx")
+  @@index([contactUserId], name: "contact_contact_user_id_idx")
 }
 
 model SecurityLog {

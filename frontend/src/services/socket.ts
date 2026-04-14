@@ -7,6 +7,19 @@ import {
 
 const getSocketUrl = () => {
   if (process.env.REACT_APP_SOCKET_URL) return process.env.REACT_APP_SOCKET_URL;
+  // Fallback: derive socket origin from API URL (backend), because in prod
+  // frontend origin (Vercel) differs from backend origin (Render).
+  //
+  // IMPORTANT: In CRA dev REACT_APP_API_URL might be relative (e.g. '/api/v1'),
+  // so we only derive when it's an absolute URL.
+  const apiBaseRaw = process.env.REACT_APP_API_URL?.trim();
+  if (apiBaseRaw && /^https?:\/\//i.test(apiBaseRaw)) {
+    const normalized = apiBaseRaw.replace(/\/+$/, '');
+    return normalized
+      .replace(/\/api\/v1$/i, '')
+      .replace(/\/api$/i, '');
+  }
+
   if (typeof window !== 'undefined') return window.location.origin;
   return 'http://localhost:3000';
 };

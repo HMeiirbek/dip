@@ -9,6 +9,8 @@ import { RiskPanel } from './components/RiskPanel';
 import { AdminPage } from './components/AdminPage';
 import { ModeratorPage } from './components/ModeratorPage';
 import { UserDrawer } from './components/UserPage';
+import { ChatsPanel } from './components/ChatsPanel';
+import { SupportPanel } from './components/SupportPanel';
 import { useControlCenterData } from './hooks/useControlCenterData';
 import s from './App.module.css';
 import {
@@ -20,7 +22,7 @@ import {
   RTCICECandidateData,
 } from './types';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'moderator' | 'admin';
+type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin';
 type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
@@ -178,6 +180,17 @@ export const App: React.FC = () => {
     }
   };
 
+  const reloadCurrentUser = async () => {
+    const base = await apiService.getMe();
+    let profile: any = null;
+    try {
+      profile = await apiService.getMyProfile();
+    } catch {
+      profile = null;
+    }
+    setCurrentUser({ ...base, ...(profile || {}) });
+  };
+
   const markCallActiveIfNeeded = async (callId: string) => {
     try {
       await apiService.markCallActive(callId);
@@ -206,6 +219,7 @@ export const App: React.FC = () => {
         const user = await apiService.getMe();
         console.log('[App] getMe() succeeded for user:', user.username);
         setCurrentUser(user);
+        reloadCurrentUser().catch(() => {});
         await connectSocketWithToken(token);
       } catch (e) {
         console.error('[App] getMe() failed during init:', e);
@@ -781,6 +795,7 @@ export const App: React.FC = () => {
       const user = await apiService.getMe();
       console.log('[App] handleLogin: getMe() succeeded');
       setCurrentUser(user);
+      reloadCurrentUser().catch(() => {});
       await connectSocketWithToken(token);
       setMessage(`Logged in as ${user.username}`);
     } catch (e) {
@@ -826,6 +841,8 @@ export const App: React.FC = () => {
     return <LoginForm onSuccess={handleLogin} />;
   }
 
+  const accessToken = localStorage.getItem('accessToken') || '';
+
   return (
     <div className={s.appShell}>
       <aside className={s.sidebar}>
@@ -839,8 +856,10 @@ export const App: React.FC = () => {
 
         <div className={s.nav}>
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
+          <NavItem active={activeTab === 'chats'} label="Chats" onClick={() => setActiveTab('chats')} />
           <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
+          <NavItem active={activeTab === 'support'} label="Support" onClick={() => setActiveTab('support')} />
           {!isAdmin && isModeratorLike && (
             <NavItem active={activeTab === 'moderator'} label="Moderator" onClick={() => setActiveTab('moderator')} />
           )}
@@ -904,10 +923,15 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'chats' && (
+            <ChatsPanel currentUser={currentUser} accessToken={accessToken} />
+          )}
+
           {activeTab === 'security' && (
             <SecurityPanel
               securitySessions={security.securitySessions}
               securityActivity={security.securityActivity}
+              accountNotifications={security.accountNotifications}
               verifyCode={security.verifyCode}
               setVerifyCode={security.setVerifyCode}
               resetIdentifier={security.resetIdentifier}
@@ -922,6 +946,7 @@ export const App: React.FC = () => {
               onTerminateSession={security.terminateSession}
               onRequestResetCode={security.handleForgotPassword}
               onResetPassword={security.handleResetPassword}
+              onMarkNotificationRead={security.markAccountNotificationRead}
             />
           )}
 
@@ -941,6 +966,10 @@ export const App: React.FC = () => {
               onCheckNumber={risk.handleCheckNumber}
               onReportNumber={risk.handleReportNumber}
             />
+          )}
+
+          {activeTab === 'support' && (
+            <SupportPanel />
           )}
 
           {activeTab === 'moderator' && (
@@ -1007,6 +1036,8 @@ export const App: React.FC = () => {
               onUpdateUserRole={admin.updateRole}
               onDeleteUser={admin.deleteUser}
               onForceEndCall={moderator.forceEndCall}
+              supportRequests={admin.supportRequests}
+              onUpdateSupportRequestStatus={admin.updateSupportRequestStatus}
             />
           )}
         </div>
@@ -1020,6 +1051,7 @@ export const App: React.FC = () => {
             await handleLogout();
           }}
           onRefreshAuth={handleRefreshAuth}
+          onReloadProfile={reloadCurrentUser}
           onNavigate={(tab) => {
             setActiveTab(tab);
             setProfileOpen(false);

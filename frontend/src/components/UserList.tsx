@@ -21,6 +21,7 @@ export const UserList: React.FC<UserListProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
 
   const loadUsers = useCallback(async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -59,22 +60,28 @@ export const UserList: React.FC<UserListProps> = ({
     };
 
     socketService.onPresenceChanged(handlePresenceChange);
+    pollTimerRef.current = window.setInterval(() => {
+      loadUsers({ silent: true });
+    }, 10000);
 
     return () => {
       socketService.offPresenceChanged(handlePresenceChange);
       if (refreshTimerRef.current !== null) {
         window.clearTimeout(refreshTimerRef.current);
       }
+      if (pollTimerRef.current !== null) {
+        window.clearInterval(pollTimerRef.current);
+      }
     };
   }, [loadUsers]);
 
-  const otherUsers = useMemo(
-    () =>
-      users
-        .filter((user) => user.id !== currentUserId && user.online)
-        .sort((a, b) => a.username.localeCompare(b.username)),
-    [users, currentUserId],
-  );
+  const { otherUsers, onlineCount } = useMemo(() => {
+    const others = users
+      .filter((user) => user.id !== currentUserId)
+      .sort((a, b) => a.username.localeCompare(b.username));
+    const online = others.filter((user) => isUserOnline(user)).length;
+    return { otherUsers: others, onlineCount: online };
+  }, [users, currentUserId]);
 
   if (loading) {
     return <div className={s.container}>Loading users...</div>;
@@ -97,12 +104,14 @@ export const UserList: React.FC<UserListProps> = ({
   return (
     <div className={s.container}>
       <div className={s.headerRow}>
-        <h2 className={s.title}>Users Online ({otherUsers.length})</h2>
+        <h2 className={s.title}>
+          Users ({onlineCount} online / {otherUsers.length})
+        </h2>
         <div className={s.headerMeta}>{refreshing ? 'Updating…' : 'Live via socket presence'}</div>
       </div>
 
       {otherUsers.length === 0 ? (
-        <div className={s.empty}>No other online users right now</div>
+        <div className={s.empty}>No other users yet</div>
       ) : (
         <div className={s.list}>
           {otherUsers.map((user) => (
@@ -134,7 +143,7 @@ const UserRow = React.memo(
         <span className={s.userAvatar} aria-hidden="true">👤</span>
         <div className={s.userMeta}>
           <span className={s.username}>{user.username}</span>
-          <small className={s.onlineMeta}>online now</small>
+          <small className={s.onlineMeta}>{isUserOnline(user) ? 'online' : 'offline'}</small>
         </div>
       </div>
       <CallButton
@@ -179,8 +188,24 @@ function isSameUser(a: User, b: User) {
     a.role === b.role &&
     a.createdAt === b.createdAt &&
     a.verified === b.verified &&
-    a.online === b.online
+    isUserOnline(a) === isUserOnline(b)
   );
+}
+
+function isUserOnline(user: User) {
+  const normalized = user as unknown as {
+    online?: unknown;
+    isOnline?: unknown;
+    status?: unknown;
+  };
+  if (typeof normalized.online === 'boolean') return normalized.online;
+  if (typeof normalized.online === 'string') return normalized.online.toLowerCase() === 'true';
+  if (typeof normalized.online === 'number') return normalized.online > 0;
+  if (typeof normalized.isOnline === 'boolean') return normalized.isOnline;
+  if (typeof normalized.isOnline === 'string') return normalized.isOnline.toLowerCase() === 'true';
+  if (typeof normalized.isOnline === 'number') return normalized.isOnline > 0;
+  if (typeof normalized.status === 'string') return normalized.status.toLowerCase() === 'online';
+  return false;
 }
 
 // styles moved to UserList.module.css
