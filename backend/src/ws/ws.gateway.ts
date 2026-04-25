@@ -8,7 +8,8 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UseGuards } from '@nestjs/common';
+import { WsThrottlerGuard } from './ws-throttler.guard';
 
 const wsCorsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001')
   .split(',')
@@ -45,6 +46,7 @@ interface ICECandidate {
   },
   transports: ['websocket'],
 })
+@UseGuards(WsThrottlerGuard)
 @Injectable()
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

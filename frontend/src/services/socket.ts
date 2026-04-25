@@ -83,6 +83,16 @@ class SocketService {
     return this.socket?.connected || false;
   }
 
+  updateToken(token: string): void {
+    if (this.socket) {
+      if (this.socket.auth) {
+        (this.socket.auth as any).token = token;
+      } else {
+        this.socket.auth = { token };
+      }
+    }
+  }
+
   // WebRTC signaling methods
   sendOffer(data: RTCOfferData): void {
     if (!this.socket) return;

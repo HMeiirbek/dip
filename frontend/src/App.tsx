@@ -10,6 +10,7 @@ import { AdminPage } from './components/AdminPage';
 import { ModeratorPage } from './components/ModeratorPage';
 import { UserDrawer } from './components/UserPage';
 import { useControlCenterData } from './hooks/useControlCenterData';
+import { TrafficVisualizer } from './components/TrafficVisualizer';
 import s from './App.module.css';
 import {
   User,
@@ -20,7 +21,7 @@ import {
   RTCICECandidateData,
 } from './types';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'moderator' | 'admin';
+type TabKey = 'calls' | 'security' | 'risk' | 'moderator' | 'admin' | 'traffic';
 type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
@@ -841,6 +842,7 @@ export const App: React.FC = () => {
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
+          <NavItem active={activeTab === 'traffic'} label="Traffic" onClick={() => setActiveTab('traffic')} />
           {!isAdmin && isModeratorLike && (
             <NavItem active={activeTab === 'moderator'} label="Moderator" onClick={() => setActiveTab('moderator')} />
           )}
@@ -1008,6 +1010,10 @@ export const App: React.FC = () => {
               onDeleteUser={admin.deleteUser}
               onForceEndCall={moderator.forceEndCall}
             />
+          )}
+
+          {activeTab === 'traffic' && (
+            <TrafficVisualizer />
           )}
         </div>
 

@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import socketService from './socket';
 import {
   AdminManagedSession,
   User,
@@ -27,6 +28,8 @@ class ApiService {
   private api: AxiosInstance;
   private token: string | null = null;
   private refreshTokenValue: string | null = null;
+  private isRefreshing = false;
+  private failedQueue: { resolve: (token: string) => void; reject: (error: any) => void }[] = [];
 
   constructor() {
     this.token = localStorage.getItem('accessToken')?.trim() || null;
@@ -43,14 +46,61 @@ class ApiService {
         const normalized = activeToken.trim();
         config.headers = config.headers || {};
         (config.headers as Record<string, string>)['Authorization'] = `Bearer ${normalized}`;
-        console.log('[API] Authorization header set for:', config.url, 'token length:', normalized.length);
-      } else {
-        console.log('[API] No token available for:', config.url);
       }
       return config;
     });
 
+    this.api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== '/auth/refresh') {
+          if (this.isRefreshing) {
+            try {
+              const token = await new Promise<string>((resolve, reject) => {
+                this.failedQueue.push({ resolve, reject });
+              });
+              originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              return this.api(originalRequest);
+            } catch (err) {
+              return Promise.reject(err);
+            }
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const { accessToken } = await this.refreshAuth();
+            socketService.updateToken(accessToken);
+            this.processQueue(null, accessToken);
+            originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+            return this.api(originalRequest);
+          } catch (err) {
+            this.processQueue(err, null);
+            this.logout();
+            return Promise.reject(err);
+          } finally {
+            this.isRefreshing = false;
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
     this.setAuthHeader();
+  }
+
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach((prom) => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token!);
+      }
+    });
+    this.failedQueue = [];
   }
 
   private setAuthHeader() {
