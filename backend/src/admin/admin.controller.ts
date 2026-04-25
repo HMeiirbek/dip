@@ -26,6 +26,16 @@ export class AdminController {
     return this.admin.users();
   }
 
+  @ApiOperation({ summary: 'Admin Create User' })
+  @Roles('admin')
+  @Post('users')
+  async createUser(
+    @Req() req: { user: { sub: string } },
+    @Body() body: any,
+  ) {
+    return this.admin.createUser(body.username, body.password, body.role, req.user.sub);
+  }
+
   @ApiOperation({ summary: 'Admin User Detail' })
   @Roles('admin')
   @Get('users/:id/detail')

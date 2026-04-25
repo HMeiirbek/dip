@@ -205,6 +205,32 @@ export class AdminService {
     });
   }
 
+  async createUser(username: string, password?: string, role: string = 'user', actorId?: string) {
+    const normalizedUsername = username?.trim();
+    if (!normalizedUsername) throw new BadRequestException('Username is required');
+    const pwd = password?.trim() || 'dip_user_123!';
+    const hash = await bcrypt.hash(pwd, 10);
+    
+    try {
+      const user = await this.prisma.user.create({
+        data: { username: normalizedUsername, password: hash },
+      });
+      await this.auth.setRole(user.id, role as AppRole);
+
+      if (actorId) {
+        await this.securityService.logActivity(actorId, {
+          action: `admin_created_user target=${user.id} role=${role}`,
+          at: new Date(),
+        });
+      }
+
+      return { success: true, id: user.id, username: user.username, role };
+    } catch (e: any) {
+      if (e.code === 'P2002') throw new BadRequestException('Username already exists');
+      throw e;
+    }
+  }
+
   async userDetail(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },

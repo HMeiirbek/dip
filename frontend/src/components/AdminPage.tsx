@@ -91,6 +91,11 @@ export const AdminPage: React.FC<Props> = ({
   const [passwordDraft, setPasswordDraft] = useState('');
   const [actionBusy, setActionBusy] = useState<string>('');
 
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState<'user'|'admin'|'moderator'>('user');
+  const [createError, setCreateError] = useState('');
+
   const filteredUsers = useMemo(() => {
     const query = userQuery.trim().toLowerCase();
     if (!query) return adminUsers;
@@ -159,6 +164,24 @@ export const AdminPage: React.FC<Props> = ({
       await refreshSelectedUser();
     } catch (error) {
       setDetailError(getAxiosErrorMessage(error));
+    } finally {
+      setActionBusy('');
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim()) return;
+    try {
+      setActionBusy('create-user');
+      setCreateError('');
+      await apiService.createAdminUser(newUsername, newPassword, newRole);
+      setNewUsername('');
+      setNewPassword('');
+      setNewRole('user');
+      await onReloadAdmin();
+    } catch (error) {
+      setCreateError(getAxiosErrorMessage(error));
     } finally {
       setActionBusy('');
     }
@@ -284,6 +307,46 @@ export const AdminPage: React.FC<Props> = ({
       </div>
 
       <div className={s.gridMain}>
+        <section className={s.card}>
+          <div className={s.cardHeaderRow}>
+            <h3 className={s.cardTitle}>Add User</h3>
+          </div>
+          {createError && <div className={s.errorBox}>{createError}</div>}
+          <form className={s.inlineControlsWrap} onSubmit={handleCreateUser}>
+            <input
+              className={s.input}
+              placeholder="Username"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              required
+            />
+            <input
+              className={s.input}
+              placeholder="Password (optional)"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <select
+              className={s.input}
+              style={{ width: 'auto' }}
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value as any)}
+            >
+              <option value="user">User</option>
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button
+              type="submit"
+              className={s.primaryButton}
+              disabled={actionBusy === 'create-user' || !newUsername.trim()}
+            >
+              {actionBusy === 'create-user' ? 'Creating...' : 'Create User'}
+            </button>
+          </form>
+        </section>
+
         <section className={s.card}>
           <div className={s.cardHeaderRow}>
             <h3 className={s.cardTitle}>User directory</h3>

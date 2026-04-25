@@ -381,6 +381,11 @@ class ApiService {
     return response.data;
   }
 
+  async createAdminUser(username: string, password?: string, role: string = 'user'): Promise<any> {
+    const response = await this.api.post('/admin/users', { username, password, role });
+    return response.data;
+  }
+
   async updateUserRole(id: string, role: 'user' | 'admin' | 'moderator'): Promise<any> {
     const response = await this.api.put(`/admin/users/${id}/role`, { role });
     return response.data;
