@@ -1,37 +1,49 @@
 import { Injectable } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
-  private readonly items: Array<{
-    id: string;
-    userId: string;
-    type: string;
-    message: string;
-    isRead: boolean;
-    createdAt: Date;
-  }> = [];
+  constructor(private readonly prisma: PrismaService) {}
 
   async list(userId: string) {
-    return this.items.filter((item) => item.userId === userId);
+    return this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        userId: true,
+        type: true,
+        message: true,
+        isRead: true,
+        createdAt: true,
+      },
+    });
   }
 
   async markRead(userId: string, id: string) {
-    const target = this.items.find((item) => item.id === id && item.userId === userId);
-    if (target) {
-      target.isRead = true;
-    }
+    await this.prisma.notification.updateMany({
+      where: { id, userId },
+      data: { isRead: true },
+    });
     return { success: true };
   }
 
-  seed(userId: string, type: string, message: string) {
-    this.items.unshift({
-      id: crypto.randomUUID(),
-      userId,
-      type,
-      message,
-      isRead: false,
-      createdAt: new Date(),
+  async seed(userId: string, type: string, message: string) {
+    return this.prisma.notification.create({
+      data: {
+        userId,
+        type,
+        message,
+      },
+      select: {
+        id: true,
+        userId: true,
+        type: true,
+        message: true,
+        isRead: true,
+        createdAt: true,
+      },
     });
   }
 }

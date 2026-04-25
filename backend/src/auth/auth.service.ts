@@ -97,6 +97,10 @@ export class AuthService {
       userAgent: meta?.userAgent,
       ipAddress: meta?.ipAddress,
     });
+    await this.notifyUserLoginIfEnabled(user.id, {
+      ipAddress: meta?.ipAddress,
+      deviceInfo: meta?.deviceInfo,
+    });
 
     return this.buildAuthResponse(user.id, role, session.id, refreshToken);
   }
@@ -250,6 +254,24 @@ export class AuthService {
     for (const userId of userIds) {
       this.notifications.seed(userId, 'security', message);
     }
+  }
+
+  private async notifyUserLoginIfEnabled(
+    userId: string,
+    input: { ipAddress?: string; deviceInfo?: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { loginNotifications: true },
+    });
+    if (!user?.loginNotifications) {
+      return;
+    }
+
+    const ip = input.ipAddress || 'unknown ip';
+    const device = input.deviceInfo || 'unknown device';
+    const message = `New login: ${new Date().toISOString()} | IP: ${ip} | Device: ${device}`;
+    await this.notifications.seed(userId, 'security_login', message);
   }
 
   private buildAuthResponse(

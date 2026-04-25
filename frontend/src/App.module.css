@@ -268,6 +268,8 @@
 @media (max-width: 900px) {
   .appShell {
     grid-template-columns: 1fr;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   .sidebar {
@@ -277,12 +279,15 @@
     align-items: center;
     gap: 10px;
     overflow-x: auto;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav {
     flex-direction: row;
     gap: 8px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .navItem {
@@ -294,6 +299,21 @@
     margin-top: 0;
     padding-top: 0;
     margin-left: auto;
+  }
+
+  .main {
+    padding: 10px;
+    padding-left: max(10px, env(safe-area-inset-left, 0));
+    padding-right: max(10px, env(safe-area-inset-right, 0));
+  }
+
+  .contentWrap {
+    min-height: min(70dvh, 720px);
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0));
+  }
+
+  .topbar {
+    flex-wrap: wrap;
   }
 }
 

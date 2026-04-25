@@ -1,0 +1,516 @@
+.root {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 16px;
+  min-height: calc(100vh - 140px);
+  min-height: calc(100dvh - 140px);
+  align-items: stretch;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primaryToolbar {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(120, 180, 255, 0.22);
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.secondaryToolbar {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.createGroupPanel {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  background: rgba(120, 180, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.createGroupTitle {
+  font-weight: 900;
+  font-size: 15px;
+}
+
+.createGroupHint {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chipRemove {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.searchInput {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.15);
+  color: inherit;
+  font-size: 16px;
+}
+
+.button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chatList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.chatItem {
+  text-align: left;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.chatItemActive {
+  border-color: rgba(120,180,255,0.35);
+  background: rgba(120,180,255,0.10);
+}
+
+.chatTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.chatTitle {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 90, 90, 0.9);
+  color: #fff;
+}
+
+.chatPreview {
+  margin-top: 6px;
+  opacity: 0.9;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatPreviewEmpty {
+  margin-top: 6px;
+  opacity: 0.6;
+  font-size: 13px;
+}
+
+.chatLastTime {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+}
+
+.backButton {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.headerMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.headerTitle {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerMeta {
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.groupMembers {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.memberRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.ownerBadge {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.addMemberRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.memberInput {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.15);
+  color: inherit;
+  font-size: 13px;
+}
+
+.smallButton {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.messages {
+  margin-top: 12px;
+  flex: 1;
+  overflow: auto;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msgRow {
+  display: flex;
+}
+
+.msgRowMine {
+  justify-content: flex-end;
+}
+
+.msgRowOther {
+  justify-content: flex-start;
+}
+
+.msgBubble {
+  max-width: min(640px, 92%);
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.msgMine {
+  background: rgba(120,180,255,0.14);
+  border-color: rgba(120,180,255,0.25);
+}
+
+.msgOther {
+  background: rgba(255,255,255,0.05);
+}
+
+.msgText {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msgMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+  text-align: right;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.composerInput {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.15);
+  color: inherit;
+  font-size: 16px;
+}
+
+.error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 90, 90, 0.3);
+  background: rgba(255, 90, 90, 0.10);
+}
+
+.searchResults {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.sectionTitle {
+  font-weight: 800;
+  opacity: 0.85;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.resultItem {
+  text-align: left;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+
+.resultItemGrow {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.resultAction {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 180, 255, 0.35);
+  background: rgba(120, 180, 255, 0.12);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.resultAction:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.resultActionSecondary {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.resultTitle {
+  font-weight: 700;
+}
+
+.resultMeta {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .root {
+    grid-template-columns: 1fr;
+    min-height: min(calc(100dvh - 200px), 900px);
+    gap: 12px;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .root.mobileShowList .right {
+    display: none;
+  }
+
+  .root.mobileShowChat .left {
+    display: none;
+  }
+
+  .root.mobileShowChat .right {
+    display: flex;
+    flex: 1;
+    min-height: min(72dvh, 620px);
+  }
+
+  .chatList {
+    flex: 1;
+    max-height: none;
+  }
+
+  .searchResults {
+    max-height: 200px;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 180px;
+    max-height: 50dvh;
+  }
+
+  .resultRow {
+    flex-wrap: wrap;
+  }
+
+  .resultAction,
+  .resultActionSecondary {
+    flex: 1 1 auto;
+    min-width: 72px;
+  }
+}
+

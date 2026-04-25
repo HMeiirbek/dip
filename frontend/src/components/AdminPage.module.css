@@ -406,3 +406,21 @@
     min-width: 640px;
   }
 }
+
+.select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-bg2);
+  color: var(--text);
+  font-size: 13px;
+  max-width: 140px;
+}
+
+.supportPreviewCell {
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}

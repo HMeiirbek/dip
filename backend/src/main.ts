@@ -2,9 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
   // Log JWT configuration
   const jwtSecretConfigured = !!process.env.JWT_SECRET;
@@ -33,6 +35,14 @@ async function bootstrap() {
   };
   app.enableCors(corsOptions);
   console.log(`CORS origins: ${JSON.stringify(corsOrigins)}`);
+
+  // Serve uploaded files (avatars) from /uploads/*
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    },
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('DIP Backend API')

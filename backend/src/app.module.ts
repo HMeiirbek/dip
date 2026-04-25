@@ -14,6 +14,8 @@ import { MessagesModule } from './messages/messages.module';
 import { SettingsModule } from './settings/settings.module';
 import { AdminModule } from './admin/admin.module';
 import { MlModule } from './ml/ml.module';
+import { ChatsModule } from './chats/chats.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { MlModule } from './ml/ml.module';
     SettingsModule,
     AdminModule,
     MlModule,
+    ChatsModule,
+    SupportModule,
   ],
   providers: [
     {
