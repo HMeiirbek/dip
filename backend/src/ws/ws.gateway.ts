@@ -129,6 +129,15 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.emitCallEnded(e.callId, [e.callerId, e.calleeId], e.reason || 'rejected');
     });
+
+    this.callEvents.onAccepted((e) => {
+      const callerSocketId = this.presence.getSocketIdByUserId(e.callerId);
+      if (callerSocketId) {
+        this.server.to(callerSocketId).emit('call:accepted', {
+          callId: e.callId,
+        });
+      }
+    });
   }
 
   async handleConnection(client: Socket) {

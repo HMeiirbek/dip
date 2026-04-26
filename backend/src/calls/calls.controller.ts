@@ -74,7 +74,13 @@ export class CallsController {
     @Req() req: { user: { sub: string } },
     @Param('id') id: string,
   ) {
-    return this.calls.accept(id, req.user.sub);
+    const call = await this.calls.accept(id, req.user.sub);
+    this.callEvents.emitAccepted({
+      callId: call.id,
+      callerId: call.callerId,
+      calleeId: call.calleeId,
+    });
+    return call;
   }
 
   @ApiOperation({ summary: 'Reject Call' })

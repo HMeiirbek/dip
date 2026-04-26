@@ -169,6 +169,11 @@ class SocketService {
     });
   }
 
+  onCallAccepted(callback: (data: { callId: string }) => void): void {
+    if (!this.socket) return;
+    this.socket.on('call:accepted', callback);
+  }
+
   onCallEnded(callback: (data: { callId: string }) => void): void {
     if (!this.socket) return;
     this.socket.on('call:ended', callback);
@@ -202,6 +207,11 @@ class SocketService {
   offIncomingCall(): void {
     if (!this.socket) return;
     this.socket.off('call:incoming');
+  }
+
+  offCallAccepted(): void {
+    if (!this.socket) return;
+    this.socket.off('call:accepted');
   }
 
   offCallEnded(): void {

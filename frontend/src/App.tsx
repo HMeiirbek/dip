@@ -544,9 +544,13 @@ export const App: React.FC = () => {
       }
 
       const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
+      const localDescriptionSet = pc.setLocalDescription(answer);
+      const acceptRequest = apiService.acceptCall(incomingCall.id).catch((e) => {
+        console.error('DB accept failed:', e);
+        return null;
+      });
 
-      await apiService.acceptCall(incomingCall.id);
+      await localDescriptionSet;
 
       socketService.sendAnswer({
         callId: incomingCall.id,
@@ -554,6 +558,8 @@ export const App: React.FC = () => {
         to: incomingCall.callerId,
         answer: answer as RTCSessionDescriptionInit,
       });
+
+      await acceptRequest;
 
       const callObj: Call = {
         id: incomingCall.id,
@@ -697,6 +703,7 @@ export const App: React.FC = () => {
     socketService.offAnswer();
     socketService.offICECandidate();
     socketService.offIncomingCall();
+    socketService.offCallAccepted();
     socketService.offCallEnded();
     if (moderationPresenceListenerRef.current) {
       socketService.offPresenceChanged(moderationPresenceListenerRef.current);
@@ -729,6 +736,17 @@ export const App: React.FC = () => {
         setCallStatus('incoming');
         setActiveTab('calls');
       }
+    });
+
+    socketService.onCallAccepted((data: { callId: string }) => {
+      if (activeCallRef.current?.id !== data.callId) {
+        return;
+      }
+
+      setActiveCall((prev) => (prev && prev.id === data.callId ? { ...prev, status: 'accepted' } : prev));
+      setMessage('Call accepted. Connecting audio...');
+      setCallStatus((prev) => (prev === 'active' ? prev : 'calling'));
+      setActiveTab('calls');
     });
 
     socketService.onAnswer(async (data: RTCAnswerData) => {
