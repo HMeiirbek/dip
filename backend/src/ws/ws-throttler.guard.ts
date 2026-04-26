@@ -13,6 +13,13 @@ export class WsThrottlerGuard extends ThrottlerGuard {
     }
 
     const client: Socket = context.switchToWs().getClient();
+    const message = context.switchToWs().getPattern();
+
+    // Whitelist WebRTC signaling - high frequency packets must not be dropped
+    if (typeof message === 'string' && (message.startsWith('webrtc:') || message.startsWith('call:'))) {
+      return true;
+    }
+
     const ip = client.conn?.remoteAddress || client.request?.connection?.remoteAddress || 'unknown-ip';
     const key = this.generateKey(context, ip, throttler.name || 'default');
     
