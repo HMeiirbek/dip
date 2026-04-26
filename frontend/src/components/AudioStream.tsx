@@ -5,134 +5,57 @@ interface AudioStreamProps {
   stream: MediaStream | null;
   isMuted?: boolean;
   label?: string;
-  playbackContext?: AudioContext | null;
-  playbackUnlockKey?: number;
 }
 
 export const AudioStream: React.FC<AudioStreamProps> = ({
   stream,
   isMuted = false,
   label = 'Audio',
-  playbackContext = null,
-  playbackUnlockKey = 0,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [, setStreamVersion] = useState(0);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) {
+      console.log('[AudioStream] No audio element ref');
       return;
     }
 
     audio.muted = isMuted;
-    audio.volume = 1;
 
     if (!stream) {
+      console.log('[AudioStream]', label, '- no stream');
       audio.srcObject = null;
       return;
     }
 
+    console.log('[AudioStream]', label, '- setting stream with', stream.getTracks().length, 'tracks');
     audio.srcObject = stream;
-
-    let unlockAttached = false;
-    let unlocked = false;
-    const cleanupFns: Array<() => void> = [];
-    let sourceNode: MediaStreamAudioSourceNode | null = null;
-    let gainNode: GainNode | null = null;
-    const detachUnlockListeners = () => {
-      if (!unlockAttached) {
-        return;
-      }
-      unlockAttached = false;
-      document.removeEventListener('pointerdown', retryPlayback, true);
-      document.removeEventListener('keydown', retryPlayback, true);
-      document.removeEventListener('touchstart', retryPlayback, true);
-    };
-    const connectWebAudioFallback = async () => {
-      if (isMuted || !playbackContext || sourceNode || !stream.getAudioTracks().length) {
-        return;
-      }
-
-      try {
-        if (playbackContext.state === 'suspended') {
-          await playbackContext.resume();
-        }
-        sourceNode = playbackContext.createMediaStreamSource(stream);
-        gainNode = playbackContext.createGain();
-        gainNode.gain.value = 1;
-        sourceNode.connect(gainNode);
-        gainNode.connect(playbackContext.destination);
-      } catch (err) {
-        console.error('Error connecting WebAudio fallback:', err);
-      }
-    };
     const tryPlay = () => {
+      console.log('[AudioStream]', label, '- attempting to play');
       audio.play()
         .then(() => {
-          unlocked = true;
-          detachUnlockListeners();
+          console.log('[AudioStream]', label, '- playback started');
+          setPlaybackBlocked(false);
         })
         .catch((err) => {
-          console.error('Error playing audio:', err);
-          void connectWebAudioFallback();
-          if (!unlockAttached) {
-            unlockAttached = true;
-            document.addEventListener('pointerdown', retryPlayback, true);
-            document.addEventListener('keydown', retryPlayback, true);
-            document.addEventListener('touchstart', retryPlayback, true);
+          console.error('[AudioStream]', label, '- play error:', err);
+          if (!isMuted) {
+            setPlaybackBlocked(true);
           }
         });
-    };
-    const retryPlayback = () => {
-      if (unlocked) {
-        detachUnlockListeners();
-        return;
-      }
-      tryPlay();
-    };
-    const refresh = () => {
-      setStreamVersion((value) => value + 1);
-      tryPlay();
-    };
-    const bindTrack = (track: MediaStreamTrack) => {
-      track.addEventListener('unmute', refresh);
-      track.addEventListener('mute', refresh);
-      track.addEventListener('ended', refresh);
-      cleanupFns.push(() => {
-        track.removeEventListener('unmute', refresh);
-        track.removeEventListener('mute', refresh);
-        track.removeEventListener('ended', refresh);
-      });
-    };
-    const handleAddTrack = (event: MediaStreamTrackEvent) => {
-      bindTrack(event.track);
-      refresh();
-    };
-    const handleRemoveTrack = () => {
-      refresh();
     };
 
     tryPlay();
     audio.addEventListener('loadedmetadata', tryPlay);
-    stream.getAudioTracks().forEach(bindTrack);
-    stream.addEventListener('addtrack', handleAddTrack);
-    stream.addEventListener('removetrack', handleRemoveTrack);
 
     return () => {
-      detachUnlockListeners();
       audio.removeEventListener('loadedmetadata', tryPlay);
-      stream.removeEventListener('addtrack', handleAddTrack);
-      stream.removeEventListener('removetrack', handleRemoveTrack);
-      cleanupFns.forEach((cleanup) => cleanup());
-      gainNode?.disconnect();
-      sourceNode?.disconnect();
     };
-  }, [stream, isMuted, playbackContext, playbackUnlockKey]);
+  }, [stream, isMuted, label]);
 
-  const hasLiveAudio = Boolean(
-    stream?.getAudioTracks().some((track) => track.readyState === 'live' && !track.muted),
-  );
+  const hasLiveAudio = Boolean(stream?.getAudioTracks().some((track) => track.readyState === 'live'));
 
   return (
     <div className={s.container}>
@@ -144,6 +67,28 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
         playsInline
         muted={isMuted}
       />
+      {!isMuted && stream && playbackBlocked && (
+        <button
+          type="button"
+          className={s.unlockButton}
+          onClick={() => {
+            const audio = audioRef.current;
+            if (!audio) {
+              return;
+            }
+
+            audio.play()
+              .then(() => {
+                setPlaybackBlocked(false);
+              })
+              .catch((err) => {
+                console.error('Manual audio play failed:', err);
+              });
+          }}
+        >
+          Enable Audio
+        </button>
+      )}
       <div className={s.status}>
         {hasLiveAudio ? '🔊 Stream Active' : '⏸️ No Stream'}
       </div>

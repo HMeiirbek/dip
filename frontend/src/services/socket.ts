@@ -95,7 +95,11 @@ class SocketService {
 
   // WebRTC signaling methods
   sendOffer(data: RTCOfferData): void {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('[SocketService] sendOffer: socket not connected');
+      return;
+    }
+    console.log('[SocketService] Sending offer for call:', data.callId, 'to:', data.to);
     this.socket.emit('webrtc:offer', {
       callId: data.callId,
       targetUserId: data.to,
@@ -106,6 +110,7 @@ class SocketService {
   onOffer(callback: (data: RTCOfferData) => void): void {
     if (!this.socket) return;
     this.socket.on('webrtc:offer', (payload: any) => {
+      console.log('[SocketService] Received offer:', payload.callId, 'from:', payload.senderId);
       callback({
         callId: payload.callId,
         from: payload.senderId ?? payload.from,
@@ -116,7 +121,11 @@ class SocketService {
   }
 
   sendAnswer(data: RTCAnswerData): void {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('[SocketService] sendAnswer: socket not connected');
+      return;
+    }
+    console.log('[SocketService] Sending answer for call:', data.callId, 'to:', data.to);
     this.socket.emit('webrtc:answer', {
       callId: data.callId,
       targetUserId: data.to,
@@ -127,6 +136,7 @@ class SocketService {
   onAnswer(callback: (data: RTCAnswerData) => void): void {
     if (!this.socket) return;
     this.socket.on('webrtc:answer', (payload: any) => {
+      console.log('[SocketService] Received answer:', payload.callId, 'from:', payload.senderId);
       callback({
         callId: payload.callId,
         from: payload.senderId ?? payload.from,
@@ -137,7 +147,10 @@ class SocketService {
   }
 
   sendICECandidate(data: RTCICECandidateData): void {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('[SocketService] sendICECandidate: socket not connected');
+      return;
+    }
     this.socket.emit('webrtc:ice-candidate', {
       callId: data.callId,
       targetUserId: data.to,
@@ -148,6 +161,7 @@ class SocketService {
   onICECandidate(callback: (data: RTCICECandidateData) => void): void {
     if (!this.socket) return;
     this.socket.on('webrtc:ice-candidate', (payload: any) => {
+      console.log('[SocketService] Received ICE candidate for call:', payload.callId);
       callback({
         callId: payload.callId,
         from: payload.senderId ?? payload.from,

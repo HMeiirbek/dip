@@ -284,12 +284,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     if (!data?.callId || !data?.targetUserId || !data?.offer) {
+      this.logger.warn(`[WebRTC] Invalid offer data: missing required fields`);
       client.emit('error', { message: 'callId, targetUserId and offer required' });
       return;
     }
 
     const senderId = this.presence.getUserIdBySocketId(client.id);
     if (!senderId) {
+      this.logger.warn(`[WebRTC] Offer from unauthenticated socket`);
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
@@ -297,6 +299,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
+      this.logger.warn(`[WebRTC] Unauthorized offer: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
@@ -304,11 +307,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetUserId = this.resolveCounterpartyUserId(call, senderId);
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
+      this.logger.warn(`[WebRTC] Target user offline for offer: ${targetUserId}`);
       client.emit('error', { message: 'Target user is not online' });
       return;
     }
 
-    this.logger.debug(`WebRTC offer: ${data.callId} from ${senderId} to ${targetUserId}`);
+    this.logger.log(`[WebRTC] Forwarding offer: ${data.callId} from ${senderId} to ${targetUserId}`);
 
     this.server.to(targetSocketId).emit('webrtc:offer', {
       callId: data.callId,
@@ -323,12 +327,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     if (!data?.callId || !data?.targetUserId || !data?.answer) {
+      this.logger.warn(`[WebRTC] Invalid answer data: missing required fields`);
       client.emit('error', { message: 'callId, targetUserId and answer required' });
       return;
     }
 
     const senderId = this.presence.getUserIdBySocketId(client.id);
     if (!senderId) {
+      this.logger.warn(`[WebRTC] Answer from unauthenticated socket`);
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
@@ -336,6 +342,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
+      this.logger.warn(`[WebRTC] Unauthorized answer: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
@@ -343,11 +350,12 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetUserId = this.resolveCounterpartyUserId(call, senderId);
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
+      this.logger.warn(`[WebRTC] Target user offline for answer: ${targetUserId}`);
       client.emit('error', { message: 'Target user is not online' });
       return;
     }
 
-    this.logger.debug(`WebRTC answer: ${data.callId} from ${senderId} to ${targetUserId}`);
+    this.logger.log(`[WebRTC] Forwarding answer: ${data.callId} from ${senderId} to ${targetUserId}`);
 
     this.server.to(targetSocketId).emit('webrtc:answer', {
       callId: data.callId,
@@ -362,12 +370,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     if (!data?.callId || !data?.targetUserId || !data?.candidate) {
+      this.logger.warn(`[WebRTC] Invalid ICE data: missing required fields`);
       client.emit('error', { message: 'callId, targetUserId and candidate required' });
       return;
     }
 
     const senderId = this.presence.getUserIdBySocketId(client.id);
     if (!senderId) {
+      this.logger.warn(`[WebRTC] ICE from unauthenticated socket`);
       client.emit('error', { message: 'Not authenticated' });
       return;
     }
@@ -375,6 +385,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       call = await this.callsService.findById(data.callId, senderId);
     } catch (err) {
+      this.logger.warn(`[WebRTC] Unauthorized ICE: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
@@ -383,9 +394,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       // Silently ignore if target is offline
+      this.logger.debug(`[WebRTC] Target offline for ICE, ignoring: ${targetUserId}`);
       return;
     }
 
+    this.logger.debug(`[WebRTC] Forwarding ICE: ${data.callId}`);
     this.server.to(targetSocketId).emit('webrtc:ice-candidate', {
       callId: data.callId,
       senderId,

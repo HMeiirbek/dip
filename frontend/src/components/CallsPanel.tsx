@@ -19,8 +19,6 @@ interface CallsPanelProps {
   onEnd: () => Promise<void> | void;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
-  playbackContext: AudioContext | null;
-  audioPlaybackUnlockKey: number;
 }
 
 export const CallsPanel: React.FC<CallsPanelProps> = ({
@@ -37,8 +35,6 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   onEnd,
   localStream,
   remoteStream,
-  playbackContext,
-  audioPlaybackUnlockKey,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
   return (
@@ -72,15 +68,11 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
                 stream={localStream}
                 isMuted={true}
                 label="Your Audio"
-                playbackContext={playbackContext}
-                playbackUnlockKey={audioPlaybackUnlockKey}
               />
               <AudioStream
                 stream={remoteStream}
                 isMuted={false}
                 label="Remote Audio"
-                playbackContext={playbackContext}
-                playbackUnlockKey={audioPlaybackUnlockKey}
               />
             </div>
           </div>
