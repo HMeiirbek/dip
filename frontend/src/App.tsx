@@ -326,18 +326,12 @@ export const App: React.FC = () => {
       let receiveOnly = false;
 
       try {
-        console.log('[WebRTC] Requesting user media (audio only)');
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('MediaDevices API unavailable.');
         }
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log('[WebRTC] Got media stream with', stream.getTracks().length, 'tracks');
-        stream.getTracks().forEach((track) => {
-          console.log('[WebRTC] Track:', track.kind, 'id:', track.id, 'readyState:', track.readyState);
-        });
         setLocalStream(stream);
       } catch (mediaError) {
-        console.error('[WebRTC] getUserMedia error:', mediaError);
         if (!options?.allowReceiveOnlyFallback) {
           throw mediaError;
         }
@@ -353,49 +347,21 @@ export const App: React.FC = () => {
       const pc = new RTCPeerConnection({
         iceServers: getIceServers(),
         iceTransportPolicy: getIceTransportPolicy(),
-        iceCandidatePoolSize: 10,
+        iceCandidatePoolSize: 4,
       });
-      console.log('[WebRTC] Peer connection created');
 
       if (stream) {
-        const audioTracks = stream.getAudioTracks();
-        console.log('[WebRTC] Adding local tracks to peer connection:', audioTracks.length);
-        stream.getTracks().forEach((track) => {
-          console.log('[WebRTC] Adding track:', track.kind, track.id, 'readyState:', track.readyState);
-          pc.addTrack(track, stream!);
-        });
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
       } else if (receiveOnly) {
-        console.log('[WebRTC] Peer connection in receive-only mode');
         pc.addTransceiver('audio', { direction: 'recvonly' });
       }
 
       pc.ontrack = (event) => {
-        console.log('[WebRTC] ontrack fired - track kind:', event.track.kind, 'readyState:', event.track.readyState);
-        console.log('[WebRTC] event.streams available:', event.streams?.length);
-        
-        // Always prefer event.streams[0] if available, otherwise create stream with the track
-        const nextStream = event.streams?.[0];
-        if (nextStream) {
-          console.log('[WebRTC] Using stream from event.streams[0]');
-          setRemoteStream(nextStream);
-        } else {
-          console.log('[WebRTC] Creating new stream for track:', event.track.id);
-          const newStream = new MediaStream([event.track]);
-          setRemoteStream(newStream);
-        }
-        
-        // Log track state changes
-        event.track.onunmute = () => console.log('[WebRTC] Track unmuted:', event.track.kind, event.track.id);
-        event.track.onmute = () => console.log('[WebRTC] Track muted:', event.track.kind, event.track.id);
-        event.track.onended = () => console.log('[WebRTC] Track ended:', event.track.kind, event.track.id);
+        setRemoteStream(event.streams[0]);
       };
 
       pc.onicecandidate = (event) => {
-        if (!event.candidate) {
-          console.log('[WebRTC] ICE gathering completed');
-          return;
-        }
-        console.log('[WebRTC] Sending ICE candidate');
+        if (!event.candidate) return;
         const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
         socketService.sendICECandidate({
           callId: call.id,
@@ -406,24 +372,17 @@ export const App: React.FC = () => {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log('[WebRTC] Connection state changed:', pc.connectionState);
         if (pc.connectionState === 'connected') {
-          console.log('[WebRTC] Connected! Checking remote stream...');
-          if (pc.getReceivers().length > 0) {
-            console.log('[WebRTC] Receivers available:', pc.getReceivers().length);
-          }
-          setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev));
-          setCallStatus('active');
           if (activeCallRef.current?.id) {
             markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
               console.error('Failed to mark call active:', e);
             });
           }
+          setCallStatus('active');
           return;
         }
 
         if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-          console.log('[WebRTC] Connection failed or closed');
           setCallStatus('ended');
           stopQualityReporter();
           endCall();
@@ -596,15 +555,12 @@ export const App: React.FC = () => {
 
       console.log('[Calls] Creating answer...');
       const answer = await pc.createAnswer();
-      const localDescriptionSet = pc.setLocalDescription(answer);
-      const acceptRequest = apiService.acceptCall(incomingCall.id).catch((e) => {
-        console.error('DB accept failed:', e);
-        return null;
-      });
+      await pc.setLocalDescription(answer);
 
-      await localDescriptionSet;
+      console.log('[Calls] Updating call status in DB...');
+      await apiService.acceptCall(incomingCall.id);
 
-      console.log('[Calls] Sending answer...');
+      console.log('[Calls] Sending answer via socket...');
       socketService.sendAnswer({
         callId: incomingCall.id,
         from: currentUser.id,
@@ -625,8 +581,6 @@ export const App: React.FC = () => {
       setIncomingCall(null);
       setIncomingOfferReady(false);
       setCallStatus('active');
-
-      void acceptRequest;
     } catch (e) {
       console.error('Error accepting call:', e);
       stopQualityReporter();
@@ -789,53 +743,26 @@ export const App: React.FC = () => {
     });
 
     socketService.onOffer(async (data: RTCOfferData) => {
-      console.log('[WebRTC] Received offer for call:', data.callId);
-      if (!currentUserRef.current) {
-        console.warn('[WebRTC] Current user not available');
-        return;
-      }
+      if (!currentUserRef.current) return;
       pendingOfferRef.current = data.offer;
       pendingIceCandidatesRef.current = [];
       setIncomingOfferReady(true);
-      console.log('[WebRTC] Offer ready for processing');
+
+      const caller = await getUserDetails(data.from);
+      if (caller) setRemoteUsername(caller.username);
 
       if (incomingCallRef.current?.id !== data.callId) {
-        void handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
+        handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
       } else {
         setCallStatus('incoming');
         setActiveTab('calls');
-        getUserDetails(data.from)
-          .then((caller) => {
-            if (caller) setRemoteUsername(caller.username);
-          })
-          .catch(() => {});
       }
-    });
-
-    socketService.onCallAccepted((data: { callId: string }) => {
-      if (activeCallRef.current?.id !== data.callId) {
-        return;
-      }
-
-      activeCallRef.current = activeCallRef.current
-        ? { ...activeCallRef.current, status: 'accepted' }
-        : activeCallRef.current;
-      setActiveCall((prev) => (prev && prev.id === data.callId ? { ...prev, status: 'accepted' } : prev));
-      setMessage('Call accepted. Connecting audio...');
-      setCallStatus((prev) => (prev === 'active' ? prev : 'calling'));
-      setActiveTab('calls');
     });
 
     socketService.onAnswer(async (data: RTCAnswerData) => {
-      console.log('[WebRTC] Received answer for call:', data.callId);
-      if (!peerConnectionRef.current) {
-        console.warn('[WebRTC] No peer connection for answer');
-        return;
-      }
+      if (!peerConnectionRef.current) return;
       try {
-        console.log('[WebRTC] Setting remote description with answer');
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-        console.log('[WebRTC] Remote description set, adding pending ICE candidates');
         while (pendingIceCandidatesRef.current.length > 0) {
           const candidate = pendingIceCandidatesRef.current.shift();
           if (candidate) {
@@ -843,37 +770,23 @@ export const App: React.FC = () => {
           }
         }
         if (activeCallRef.current) {
-          activeCallRef.current = { ...activeCallRef.current, status: 'active' };
-          setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev));
-          setCallStatus('active');
-          markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
-            console.error('Failed to mark call active after answer:', e);
-          });
-          return;
+          await markCallActiveIfNeeded(activeCallRef.current.id);
         }
         setCallStatus('active');
       } catch (e) {
-        console.error('[WebRTC] Error processing answer:', e);
+        console.error(e);
       }
     });
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {
-      console.log('[WebRTC] Received ICE candidate for call:', data.callId);
-      if (!peerConnectionRef.current) {
-        console.warn('[WebRTC] No peer connection yet, queuing ICE candidate');
-        pendingIceCandidatesRef.current.push(data.candidate);
-        return;
-      }
-      if (!peerConnectionRef.current.remoteDescription) {
-        console.log('[WebRTC] Remote description not yet set, queuing ICE candidate');
+      if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
         pendingIceCandidatesRef.current.push(data.candidate);
         return;
       }
       try {
-        console.log('[WebRTC] Adding ICE candidate');
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
       } catch (e) {
-        console.error('[WebRTC] Error adding ICE candidate:', e);
+        console.error(e);
       }
     });
 

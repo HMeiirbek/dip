@@ -8,8 +8,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, UseGuards } from '@nestjs/common';
-import { WsThrottlerGuard } from './ws-throttler.guard';
+import { Injectable, Logger } from '@nestjs/common';
 
 const wsCorsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:3001')
   .split(',')
