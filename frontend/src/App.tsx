@@ -61,6 +61,18 @@ const getIceServers = (): RTCIceServer[] => {
       username: turnUsername,
       credential: turnCredential,
     });
+  } else {
+    // PUBLIC FALLBACK TURN SERVER for NAT Traversal (Carrier Grade NAT / LTE support)
+    // Used instantly when standard .env config is missing.
+    servers.push({
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    });
   }
 
   return servers;
