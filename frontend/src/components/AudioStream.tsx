@@ -5,12 +5,16 @@ interface AudioStreamProps {
   stream: MediaStream | null;
   isMuted?: boolean;
   label?: string;
+  playbackContext?: AudioContext | null;
+  playbackUnlockKey?: number;
 }
 
 export const AudioStream: React.FC<AudioStreamProps> = ({
   stream,
   isMuted = false,
   label = 'Audio',
+  playbackContext = null,
+  playbackUnlockKey = 0,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [, setStreamVersion] = useState(0);
@@ -34,6 +38,8 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
     let unlockAttached = false;
     let unlocked = false;
     const cleanupFns: Array<() => void> = [];
+    let sourceNode: MediaStreamAudioSourceNode | null = null;
+    let gainNode: GainNode | null = null;
     const detachUnlockListeners = () => {
       if (!unlockAttached) {
         return;
@@ -43,6 +49,24 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
       document.removeEventListener('keydown', retryPlayback, true);
       document.removeEventListener('touchstart', retryPlayback, true);
     };
+    const connectWebAudioFallback = async () => {
+      if (isMuted || !playbackContext || sourceNode || !stream.getAudioTracks().length) {
+        return;
+      }
+
+      try {
+        if (playbackContext.state === 'suspended') {
+          await playbackContext.resume();
+        }
+        sourceNode = playbackContext.createMediaStreamSource(stream);
+        gainNode = playbackContext.createGain();
+        gainNode.gain.value = 1;
+        sourceNode.connect(gainNode);
+        gainNode.connect(playbackContext.destination);
+      } catch (err) {
+        console.error('Error connecting WebAudio fallback:', err);
+      }
+    };
     const tryPlay = () => {
       audio.play()
         .then(() => {
@@ -51,6 +75,7 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
         })
         .catch((err) => {
           console.error('Error playing audio:', err);
+          void connectWebAudioFallback();
           if (!unlockAttached) {
             unlockAttached = true;
             document.addEventListener('pointerdown', retryPlayback, true);
@@ -100,8 +125,10 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
       stream.removeEventListener('addtrack', handleAddTrack);
       stream.removeEventListener('removetrack', handleRemoveTrack);
       cleanupFns.forEach((cleanup) => cleanup());
+      gainNode?.disconnect();
+      sourceNode?.disconnect();
     };
-  }, [stream, isMuted]);
+  }, [stream, isMuted, playbackContext, playbackUnlockKey]);
 
   const hasLiveAudio = Boolean(
     stream?.getAudioTracks().some((track) => track.readyState === 'live' && !track.muted),

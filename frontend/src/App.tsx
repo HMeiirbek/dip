@@ -99,9 +99,11 @@ export const App: React.FC = () => {
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const remoteMediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const [incomingOfferReady, setIncomingOfferReady] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [audioPlaybackUnlockKey, setAudioPlaybackUnlockKey] = useState(0);
 
   const [notice, setNotice] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -209,6 +211,33 @@ export const App: React.FC = () => {
     }
   };
 
+  const unlockAudioPlayback = async () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const AudioContextCtor =
+      window.AudioContext ||
+      ((window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+
+    if (!AudioContextCtor) {
+      setAudioPlaybackUnlockKey((value) => value + 1);
+      return;
+    }
+
+    try {
+      const context = audioContextRef.current ?? new AudioContextCtor();
+      audioContextRef.current = context;
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+    } catch (e) {
+      console.error('Failed to unlock audio playback:', e);
+    } finally {
+      setAudioPlaybackUnlockKey((value) => value + 1);
+    }
+  };
+
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('accessToken');
@@ -242,6 +271,9 @@ export const App: React.FC = () => {
       }
       if (moderationPresenceListenerRef.current) {
         socketService.offPresenceChanged(moderationPresenceListenerRef.current);
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
@@ -541,6 +573,7 @@ export const App: React.FC = () => {
     if (!incomingCall || !currentUser) return;
 
     try {
+      await unlockAudioPlayback();
       setCallStatus('calling');
       const pc = await setupWebRTC(incomingCall, currentUser.id, {
         allowReceiveOnlyFallback: true,
@@ -692,6 +725,7 @@ export const App: React.FC = () => {
     if (!currentUser) return;
 
     try {
+      await unlockAudioPlayback();
       setCallStatus('calling');
       const callee = await getUserDetails(calleeId);
       if (callee) setRemoteUsername(callee.username);
@@ -989,6 +1023,8 @@ export const App: React.FC = () => {
               onEnd={endCall}
               localStream={localStream}
               remoteStream={remoteStream}
+              playbackContext={audioContextRef.current}
+              audioPlaybackUnlockKey={audioPlaybackUnlockKey}
             />
           )}
 
