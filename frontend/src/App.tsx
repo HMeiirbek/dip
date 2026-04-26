@@ -357,7 +357,18 @@ export const App: React.FC = () => {
       }
 
       pc.ontrack = (event) => {
-        setRemoteStream(event.streams[0]);
+        console.log('[WebRTC] received ontrack event:', event.track.kind);
+        if (event.streams && event.streams.length > 0) {
+          console.log('[WebRTC] setting remote stream from event.streams[0]');
+          setRemoteStream(event.streams[0]);
+        } else {
+          console.log('[WebRTC] event.streams is empty, creating manual stream container');
+          setRemoteStream(new MediaStream([event.track]));
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WebRTC] ICE Connection State:', pc.iceConnectionState);
       };
 
       pc.onicecandidate = (event) => {

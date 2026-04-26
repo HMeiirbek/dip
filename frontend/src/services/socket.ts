@@ -188,7 +188,7 @@ class SocketService {
     this.socket.on('call:accepted', callback);
   }
 
-  onCallEnded(callback: (data: { callId: string }) => void): void {
+  onCallEnded(callback: (data: { callId: string; reason?: string; endedBy?: string | null }) => void): void {
     if (!this.socket) return;
     this.socket.on('call:ended', callback);
   }
