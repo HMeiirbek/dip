@@ -99,7 +99,6 @@ export const App: React.FC = () => {
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const [incomingOfferReady, setIncomingOfferReady] = useState(false);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const [notice, setNotice] = useState<string>('');
@@ -330,13 +329,11 @@ export const App: React.FC = () => {
           throw new Error('MediaDevices API unavailable.');
         }
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setLocalStream(stream);
       } catch (mediaError) {
         if (!options?.allowReceiveOnlyFallback) {
           throw mediaError;
         }
         receiveOnly = true;
-        setLocalStream(null);
         setMessage(
           window.isSecureContext
             ? 'Microphone unavailable. Joining in listen-only mode.'
@@ -419,14 +416,13 @@ export const App: React.FC = () => {
 
   const resetRtcState = () => {
     if (peerConnectionRef.current) {
+      peerConnectionRef.current.getSenders().forEach((sender) => {
+        sender.track?.stop();
+      });
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
 
-    setLocalStream((prev) => {
-      prev?.getTracks().forEach((track) => track.stop());
-      return null;
-    });
     setRemoteStream(null);
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
@@ -858,7 +854,6 @@ export const App: React.FC = () => {
     incomingCallRef.current = null;
     setIncomingCall(null);
     setRemoteStream(null);
-    setLocalStream(null);
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
     setCallStatus('idle');
@@ -961,7 +956,6 @@ export const App: React.FC = () => {
               onAccept={acceptCall}
               onReject={rejectCall}
               onEnd={endCall}
-              localStream={localStream}
               remoteStream={remoteStream}
             />
           )}

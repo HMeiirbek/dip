@@ -17,7 +17,6 @@ interface CallsPanelProps {
   onAccept: () => Promise<void> | void;
   onReject: () => Promise<void> | void;
   onEnd: () => Promise<void> | void;
-  localStream: MediaStream | null;
   remoteStream: MediaStream | null;
 }
 
@@ -33,7 +32,6 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   onAccept,
   onReject,
   onEnd,
-  localStream,
   remoteStream,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
