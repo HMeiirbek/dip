@@ -60,11 +60,10 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
         </div>
 
         {callStatus === 'active' && remoteStream && (
-          <div style={{ display: 'none' }}>
+          <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}>
             <AudioStream
               stream={remoteStream}
               isMuted={false}
-              label="Remote"
             />
           </div>
         )}
