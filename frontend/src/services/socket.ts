@@ -48,6 +48,7 @@ class SocketService {
           randomizationFactor: 0.5,
           reconnectionAttempts: 5,
           timeout: 10000,
+          transports: ['websocket'],
         });
 
         this.socket.on('connect', () => {

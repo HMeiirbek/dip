@@ -19,9 +19,6 @@ export type CallQualitySampleInput = {
 @Injectable()
 export class CallsService {
   private readonly CALL_RING_TIMEOUT = 30000; // 30 seconds
-  private callCache = new Map<string, { data: any; timestamp: number }>();
-  private readonly CACHE_TTL = 5000; // 5 seconds cache for signaling bursts
-
   constructor(private prisma: PrismaService) {}
 
   private isExpired(call: { expiresAt?: Date | null }, now = new Date()) {
@@ -43,19 +40,6 @@ export class CallsService {
 
     if (callerId === calleeId) {
       throw new BadRequestException('Cannot call yourself');
-    }
-
-    const userBlock = await this.prisma.userBlacklist.findFirst({
-      where: {
-        OR: [
-          { userId: callerId, blockedUserId: calleeId },
-          { userId: calleeId, blockedUserId: callerId },
-        ],
-      },
-      select: { id: true },
-    });
-    if (userBlock) {
-      throw new ForbiddenException('Calls are not allowed between blocked users');
     }
 
     const now = new Date();
@@ -142,16 +126,6 @@ export class CallsService {
   }
 
   async findById(id: string, userId: string) {
-    const now = Date.now();
-    const cached = this.callCache.get(id);
-    if (cached && (now - cached.timestamp < this.CACHE_TTL)) {
-      const call = cached.data;
-      if (call.callerId !== userId && call.calleeId !== userId) {
-        throw new ForbiddenException('Not a participant of this call');
-      }
-      return call;
-    }
-
     const call = await this.prisma.call.findUnique({
       where: { id },
       include: {
@@ -165,7 +139,6 @@ export class CallsService {
       throw new ForbiddenException('Not a participant of this call');
     }
 
-    this.callCache.set(id, { data: call, timestamp: now });
     return call;
   }
 
@@ -195,7 +168,6 @@ export class CallsService {
       throw new BadRequestException(`Cannot accept a call with status: ${call.status}`);
     }
 
-    this.callCache.delete(id);
     return this.prisma.call.update({
       where: { id },
       data: {
@@ -218,7 +190,6 @@ export class CallsService {
       throw new BadRequestException(`Cannot reject a call with status: ${call.status}`);
     }
 
-    this.callCache.delete(id);
     return this.prisma.call.update({
       where: { id },
       data: {
@@ -254,7 +225,6 @@ export class CallsService {
       throw new BadRequestException(`Cannot mark as active: call status is ${call.status}`);
     }
 
-    this.callCache.delete(id);
     return this.prisma.call.update({
       where: { id },
       data: { status: 'active' },
@@ -271,7 +241,6 @@ export class CallsService {
       throw new ForbiddenException('Not a participant of this call');
     }
 
-    this.callCache.delete(id);
     return this.prisma.call.update({
       where: { id },
       data: {

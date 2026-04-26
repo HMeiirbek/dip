@@ -347,7 +347,7 @@ export const App: React.FC = () => {
       const pc = new RTCPeerConnection({
         iceServers: getIceServers(),
         iceTransportPolicy: getIceTransportPolicy(),
-        iceCandidatePoolSize: 10,
+        iceCandidatePoolSize: 4,
       });
 
       if (stream) {
@@ -544,12 +544,9 @@ export const App: React.FC = () => {
       }
 
       const answer = await pc.createAnswer();
-      const localDescriptionSet = pc.setLocalDescription(answer);
-      
-      await Promise.all([
-        localDescriptionSet,
-        apiService.acceptCall(incomingCall.id).catch(e => console.error('DB accept failed:', e)),
-      ]);
+      await pc.setLocalDescription(answer);
+
+      await apiService.acceptCall(incomingCall.id);
 
       socketService.sendAnswer({
         callId: incomingCall.id,
