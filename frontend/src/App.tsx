@@ -98,6 +98,7 @@ export const App: React.FC = () => {
   const moderationPresenceListenerRef = useRef<((data: { onlineCount: number; at: string }) => void) | null>(null);
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteMediaStreamRef = useRef<MediaStream | null>(null);
   const [incomingOfferReady, setIncomingOfferReady] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -349,6 +350,9 @@ export const App: React.FC = () => {
         iceTransportPolicy: getIceTransportPolicy(),
         iceCandidatePoolSize: 4,
       });
+      const remoteMediaStream = new MediaStream();
+      remoteMediaStreamRef.current = remoteMediaStream;
+      setRemoteStream(remoteMediaStream);
 
       if (stream) {
         stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
@@ -357,7 +361,20 @@ export const App: React.FC = () => {
       }
 
       pc.ontrack = (event) => {
-        setRemoteStream(event.streams[0]);
+        const targetStream = remoteMediaStreamRef.current || new MediaStream();
+        remoteMediaStreamRef.current = targetStream;
+
+        if (event.streams?.[0]) {
+          event.streams[0].getTracks().forEach((track) => {
+            if (!targetStream.getTracks().some((existing) => existing.id === track.id)) {
+              targetStream.addTrack(track);
+            }
+          });
+        } else if (!targetStream.getTracks().some((existing) => existing.id === event.track.id)) {
+          targetStream.addTrack(event.track);
+        }
+
+        setRemoteStream(targetStream);
       };
 
       pc.onicecandidate = (event) => {
@@ -373,12 +390,13 @@ export const App: React.FC = () => {
 
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'connected') {
+          setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev));
+          setCallStatus('active');
           if (activeCallRef.current?.id) {
             markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
               console.error('Failed to mark call active:', e);
             });
           }
-          setCallStatus('active');
           return;
         }
 
@@ -416,6 +434,7 @@ export const App: React.FC = () => {
       prev?.getTracks().forEach((track) => track.stop());
       return null;
     });
+    remoteMediaStreamRef.current = null;
     setRemoteStream(null);
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
@@ -760,7 +779,12 @@ export const App: React.FC = () => {
           }
         }
         if (activeCallRef.current) {
-          await markCallActiveIfNeeded(activeCallRef.current.id);
+          setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev));
+          setCallStatus('active');
+          markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
+            console.error('Failed to mark call active after answer:', e);
+          });
+          return;
         }
         setCallStatus('active');
       } catch (e) {
