@@ -37,6 +37,7 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
         className={s.audio}
         autoPlay
         playsInline
+        controls
         muted={isMuted}
       />
       <div className={s.status}>
