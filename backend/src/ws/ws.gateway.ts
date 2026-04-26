@@ -44,7 +44,6 @@ interface ICECandidate {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
   },
-  transports: ['websocket'],
 })
 @UseGuards(WsThrottlerGuard)
 @Injectable()

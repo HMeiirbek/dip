@@ -16,13 +16,14 @@ import { AdminModule } from './admin/admin.module';
 import { MlModule } from './ml/ml.module';
 import { ChatsModule } from './chats/chats.module';
 import { SupportModule } from './support/support.module';
+import { WsThrottlerGuard } from './ws/ws-throttler.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ envFilePath: ['.env.local', '.env'] }),
     ThrottlerModule.forRoot([{
       ttl: 60000,
-      limit: 150,
+      limit: 1000,
     }]),
     PrismaModule,
     AuthModule,
@@ -42,7 +43,7 @@ import { SupportModule } from './support/support.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: WsThrottlerGuard,
     },
   ],
 })
