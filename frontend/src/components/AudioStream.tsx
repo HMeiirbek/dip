@@ -41,7 +41,21 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
         muted={isMuted}
       />
       <div className={s.status}>
-        {stream ? '🔊 Stream Active' : '⏸️ No Stream'}
+        {stream ? (
+          <div>
+            <span style={{ color: '#10b981' }}>🔊 Stream Active</span>
+            <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--muted)', fontWeight: 'normal' }}>
+              {isMuted ? 'This is you speaking (muted locally so you do not hear yourself)' : 'This is what you are hearing from them'}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <span>⏸️ No Stream</span>
+            <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--muted)', fontWeight: 'normal' }}>
+              Waiting for audio connection...
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

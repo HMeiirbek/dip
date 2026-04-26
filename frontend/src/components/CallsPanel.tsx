@@ -67,12 +67,12 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
               <AudioStream
                 stream={localStream}
                 isMuted={true}
-                label="Your Audio"
+                label="🎤 Your Microphone"
               />
               <AudioStream
                 stream={remoteStream}
                 isMuted={false}
-                label="Remote Audio"
+                label={remoteUsername ? `🔊 ${remoteUsername}'s Voice` : '🔊 Remote Voice'}
               />
             </div>
           </div>
