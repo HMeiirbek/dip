@@ -72,6 +72,7 @@ model Call {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   analysis       CallAnalysis[]
+  qualityMetrics CallQualityMetrics[]
 
   @@index([expiresAt], name: "expiresAt_idx")
 }
@@ -99,20 +100,25 @@ model CallAnalysis {
 
 model Blacklist {
   id          String   @id @default(uuid())
-  phoneNumber String   @unique
+  phoneNumber String   @unique @map("phone_number")
   reason      String?
   source      String   @default("user") // user | admin | system
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("risk_blacklist")
 }
 
 model Report {
   id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phoneNumber String
+  userId      String   @map("user_id")
+  phoneNumber String   @map("phone_number")
   description String?
   status      String   @default("pending") // pending | approved | rejected
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_reports")
 }
 
 model Notification {
@@ -249,4 +255,20 @@ model MlModel {
   accuracy Float
   isActive Boolean  @default(false)
   loadedAt DateTime @default(now())
+}
+model CallQualityMetrics {
+  id              String   @id @default(uuid())
+  callId          String   @map("call_id")
+  userId          String   @map("user_id")
+  rttMs           Float?   @map("rtt_ms")
+  jitterMs        Float?   @map("jitter_ms")
+  packetLossPct   Float?   @map("packet_loss_pct")
+  mosLike         Float?   @map("mos_like")
+  bitrateKbps     Float?   @map("bitrate_kbps")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  call            Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@map("call_quality_metrics")
+  @@index([callId, createdAt])
 }

@@ -456,19 +456,17 @@ export class CallsService {
       return Math.max(min, Math.min(max, value));
     };
 
-    await this.prisma.$executeRawUnsafe(
-      `INSERT INTO call_quality_metrics
-        (id, call_id, user_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-      crypto.randomUUID(),
-      callId,
-      userId,
-      clamp(sample.rttMs, 0, 60000),
-      clamp(sample.jitterMs, 0, 60000),
-      clamp(sample.packetLossPct, 0, 100),
-      clamp(sample.mosLike, 1, 5),
-      clamp(sample.bitrateKbps, 0, 100000),
-    );
+    await this.prisma.callQualityMetrics.create({
+      data: {
+        callId,
+        userId,
+        rttMs: clamp(sample.rttMs, 0, 60000),
+        jitterMs: clamp(sample.jitterMs, 0, 60000),
+        packetLossPct: clamp(sample.packetLossPct, 0, 100),
+        mosLike: clamp(sample.mosLike, 1, 5),
+        bitrateKbps: clamp(sample.bitrateKbps, 0, 100000),
+      },
+    });
 
     return { success: true };
   }
