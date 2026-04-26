@@ -565,7 +565,11 @@ export const App: React.FC = () => {
       while (pendingIceCandidatesRef.current.length > 0) {
         const candidate = pendingIceCandidatesRef.current.shift();
         if (candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('[Calls] Failed to add queued ICE candidate', e);
+          }
         }
       }
 
@@ -784,7 +788,11 @@ export const App: React.FC = () => {
         while (pendingIceCandidatesRef.current.length > 0) {
           const candidate = pendingIceCandidatesRef.current.shift();
           if (candidate) {
-            await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+            try {
+              await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch(e) {
+              console.error('[Calls] Failed to add queued ICE candidate on answer', e);
+            }
           }
         }
         if (activeCallRef.current) {
