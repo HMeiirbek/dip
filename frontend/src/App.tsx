@@ -329,6 +329,7 @@ export const App: React.FC = () => {
           throw new Error('MediaDevices API unavailable.');
         }
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('[WebRTC][Diagnostic] Microphone acquired. Tracks:', stream.getAudioTracks().map(t => `${t.kind} (enabled=${t.enabled})`));
       } catch (mediaError) {
         if (!options?.allowReceiveOnlyFallback) {
           throw mediaError;
@@ -354,14 +355,10 @@ export const App: React.FC = () => {
       }
 
       pc.ontrack = (event) => {
-        console.log('[WebRTC] received ontrack event:', event.track.kind);
-        if (event.streams && event.streams.length > 0) {
-          console.log('[WebRTC] setting remote stream from event.streams[0]');
-          setRemoteStream(event.streams[0]);
-        } else {
-          console.log('[WebRTC] event.streams is empty, creating manual stream container');
-          setRemoteStream(new MediaStream([event.track]));
-        }
+        console.log('[WebRTC][Diagnostic] ontrack event received! TRACK:', event.track);
+        console.log('[WebRTC] setting remote stream for playback');
+        const newStream = new MediaStream([event.track]);
+        setRemoteStream(newStream);
       };
 
       pc.oniceconnectionstatechange = () => {
@@ -562,6 +559,7 @@ export const App: React.FC = () => {
 
       console.log('[Calls] Creating answer...');
       const answer = await pc.createAnswer();
+      console.log('[Calls] Answer created, SDP starts with:', answer.sdp?.substring(0, 50));
       await pc.setLocalDescription(answer);
 
       console.log('[Calls] Updating call status in DB...');
@@ -642,6 +640,7 @@ export const App: React.FC = () => {
 
     console.log('[Calls] Creating offer...');
     const offer = await pc.createOffer();
+    console.log('[Calls] Offer created, SDP starts with:', offer.sdp?.substring(0, 50));
     console.log('[Calls] Setting local description...');
     await pc.setLocalDescription(offer);
 
