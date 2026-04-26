@@ -350,9 +350,7 @@ export const App: React.FC = () => {
         iceTransportPolicy: getIceTransportPolicy(),
         iceCandidatePoolSize: 4,
       });
-      const remoteMediaStream = new MediaStream();
-      remoteMediaStreamRef.current = remoteMediaStream;
-      setRemoteStream(remoteMediaStream);
+      remoteMediaStreamRef.current = null;
 
       if (stream) {
         stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
@@ -363,6 +361,9 @@ export const App: React.FC = () => {
       pc.ontrack = (event) => {
         const targetStream = remoteMediaStreamRef.current || new MediaStream();
         remoteMediaStreamRef.current = targetStream;
+        const publishRemoteStream = () => {
+          setRemoteStream(new MediaStream(targetStream.getTracks()));
+        };
 
         if (event.streams?.[0]) {
           event.streams[0].getTracks().forEach((track) => {
@@ -374,7 +375,10 @@ export const App: React.FC = () => {
           targetStream.addTrack(event.track);
         }
 
-        setRemoteStream(targetStream);
+        event.track.onunmute = publishRemoteStream;
+        event.track.onmute = publishRemoteStream;
+        event.track.onended = publishRemoteStream;
+        publishRemoteStream();
       };
 
       pc.onicecandidate = (event) => {
