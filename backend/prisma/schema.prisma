@@ -73,6 +73,7 @@ model Call {
   updatedAt      DateTime @updatedAt
   analysis       CallAnalysis[]
   qualityMetrics CallQualityMetrics[]
+  moderationFlags ModerationCallFlag[]
 
   @@index([expiresAt], name: "expiresAt_idx")
 }
@@ -232,15 +233,7 @@ model Contact {
   @@index([contactUserId], name: "contact_contact_user_id_idx")
 }
 
-model SecurityLog {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String?
-  device    String?
-  action    String
-  createdAt DateTime @default(now())
-}
+
 
 model SystemLog {
   id        String   @id @default(uuid())
@@ -271,4 +264,73 @@ model CallQualityMetrics {
 
   @@map("call_quality_metrics")
   @@index([callId, createdAt])
+}
+
+model SecurityUserState {
+  userId     String   @id @map("user_id")
+  role       String   @default("user")
+  isVerified Boolean  @default(false) @map("is_verified")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("security_user_state")
+}
+
+model SecuritySession {
+  id               String    @id
+  userId           String    @map("user_id")
+  role             String
+  refreshTokenHash String    @map("refresh_token_hash")
+  deviceInfo       String?   @map("device_info")
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  expiresAt        DateTime  @map("expires_at")
+  lastSeenAt       DateTime  @default(now()) @map("last_seen_at")
+  revokedAt        DateTime? @map("revoked_at")
+
+  @@map("security_sessions")
+  @@index([userId])
+  @@index([refreshTokenHash])
+}
+
+model SecurityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  ipAddress String?  @map("ip_address")
+  device    String?
+  action    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("security_logs")
+}
+
+model ModerationCallFlag {
+  id        String   @id @default(uuid())
+  callId    String   @map("call_id")
+  actorId   String   @map("actor_id")
+  actorRole String   @map("actor_role")
+  reason    String
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  call Call @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@index([callId])
+  @@index([status])
+  @@map("moderation_call_flags")
+}
+
+model SecurityCode {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  kind       String    // verify | reset | delete_account
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("security_codes")
+  @@index([userId, kind])
 }
