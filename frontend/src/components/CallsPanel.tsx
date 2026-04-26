@@ -61,20 +61,13 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
           />
         </div>
 
-        {(callStatus === 'active' || callStatus === 'calling') && (
-          <div className={s.card}>
-            <div className={s.audioGrid}>
-              <AudioStream
-                stream={localStream}
-                isMuted={true}
-                label="🎤 Your Microphone"
-              />
-              <AudioStream
-                stream={remoteStream}
-                isMuted={false}
-                label={remoteUsername ? `🔊 ${remoteUsername}'s Voice` : '🔊 Remote Voice'}
-              />
-            </div>
+        {callStatus === 'active' && remoteStream && (
+          <div style={{ display: 'none' }}>
+            <AudioStream
+              stream={remoteStream}
+              isMuted={false}
+              label="Remote"
+            />
           </div>
         )}
       </div>
