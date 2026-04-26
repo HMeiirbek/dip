@@ -509,13 +509,6 @@ export const App: React.FC = () => {
   };
 
   const handleIncomingCall = async (data: { id: string; from: string; to?: string; callerName?: string }) => {
-    if (data.callerName) {
-      setRemoteUsername(data.callerName);
-    } else {
-      const caller = await getUserDetails(data.from);
-      if (caller) setRemoteUsername(caller.username);
-    }
-
     const callObj: Call = {
       id: data.id,
       callerId: data.from,
@@ -523,9 +516,21 @@ export const App: React.FC = () => {
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
+    incomingCallRef.current = callObj;
     setIncomingCall(callObj);
     setCallStatus('incoming');
     setActiveTab('calls');
+
+    if (data.callerName) {
+      setRemoteUsername(data.callerName);
+      return;
+    }
+
+    getUserDetails(data.from)
+      .then((caller) => {
+        if (caller) setRemoteUsername(caller.username);
+      })
+      .catch(() => {});
   };
 
   const acceptCall = async () => {
@@ -578,8 +583,6 @@ export const App: React.FC = () => {
         answer: answer as RTCSessionDescriptionInit,
       });
 
-      await acceptRequest;
-
       const callObj: Call = {
         id: incomingCall.id,
         callerId: incomingCall.callerId,
@@ -587,13 +590,19 @@ export const App: React.FC = () => {
         status: 'accepted',
         createdAt: incomingCall.createdAt,
       };
+      activeCallRef.current = callObj;
+      incomingCallRef.current = null;
       setActiveCall(callObj);
       setIncomingCall(null);
       setIncomingOfferReady(false);
+      setCallStatus('active');
+
+      void acceptRequest;
     } catch (e) {
       console.error('Error accepting call:', e);
       stopQualityReporter();
       resetRtcState();
+      incomingCallRef.current = null;
       setIncomingCall(null);
       setCallStatus('error');
     }
@@ -610,6 +619,7 @@ export const App: React.FC = () => {
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
     setIncomingOfferReady(false);
+    incomingCallRef.current = null;
     setIncomingCall(null);
     setCallStatus('idle');
   };
@@ -626,11 +636,13 @@ export const App: React.FC = () => {
   const startOutgoingCall = async (calleeId: string, currentUserId: string) => {
     assertWebRTCAvailable();
     const call = await apiService.createCall(calleeId);
+    activeCallRef.current = call;
     setActiveCall(call);
 
     const pc = await setupWebRTC(call, currentUserId);
     if (!pc) {
       await apiService.endCall(call.id);
+      activeCallRef.current = null;
       setActiveCall(null);
       return;
     }
@@ -703,6 +715,7 @@ export const App: React.FC = () => {
     } catch {}
 
     resetRtcState();
+    activeCallRef.current = null;
     setActiveCall(null);
     setRemoteUsername(null);
     setCallStatus('idle');
@@ -746,14 +759,16 @@ export const App: React.FC = () => {
       pendingIceCandidatesRef.current = [];
       setIncomingOfferReady(true);
 
-      const caller = await getUserDetails(data.from);
-      if (caller) setRemoteUsername(caller.username);
-
       if (incomingCallRef.current?.id !== data.callId) {
-        handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
+        void handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
       } else {
         setCallStatus('incoming');
         setActiveTab('calls');
+        getUserDetails(data.from)
+          .then((caller) => {
+            if (caller) setRemoteUsername(caller.username);
+          })
+          .catch(() => {});
       }
     });
 
@@ -762,6 +777,9 @@ export const App: React.FC = () => {
         return;
       }
 
+      activeCallRef.current = activeCallRef.current
+        ? { ...activeCallRef.current, status: 'accepted' }
+        : activeCallRef.current;
       setActiveCall((prev) => (prev && prev.id === data.callId ? { ...prev, status: 'accepted' } : prev));
       setMessage('Call accepted. Connecting audio...');
       setCallStatus((prev) => (prev === 'active' ? prev : 'calling'));
@@ -779,6 +797,7 @@ export const App: React.FC = () => {
           }
         }
         if (activeCallRef.current) {
+          activeCallRef.current = { ...activeCallRef.current, status: 'active' };
           setActiveCall((prev) => (prev ? { ...prev, status: 'active' } : prev));
           setCallStatus('active');
           markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
@@ -812,6 +831,8 @@ export const App: React.FC = () => {
       }
       stopQualityReporter();
       resetRtcState();
+      incomingCallRef.current = null;
+      activeCallRef.current = null;
       setIncomingCall(null);
       setActiveCall(null);
       setRemoteUsername(null);
@@ -854,7 +875,9 @@ export const App: React.FC = () => {
     apiService.logout();
     socketService.disconnect();
     setCurrentUser(null);
+    activeCallRef.current = null;
     setActiveCall(null);
+    incomingCallRef.current = null;
     setIncomingCall(null);
     setRemoteStream(null);
     setLocalStream(null);
