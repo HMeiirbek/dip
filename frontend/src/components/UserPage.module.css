@@ -1,35 +1,12 @@
-.backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  justify-content: flex-end;
-  z-index: 2000;
-}
-
-.sheet {
+.profileContainer {
   background: var(--panel-bg);
-  border-left: 1px solid var(--border);
-  box-shadow: var(--shadow-strong);
-  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px;
+  gap: 16px;
   color: var(--text);
-}
-
-.sheetDesktop {
-  width: min(460px, 92vw);
-}
-
-.sheetMobile {
-  width: 100%;
-  height: min(92vh, 720px);
-  align-self: flex-end;
-  border-left: none;
-  border-top: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
 }
 
 .sheetHeader {

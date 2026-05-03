@@ -5,15 +5,15 @@ import s from './UserPage.module.css';
 
 type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin';
 
-export const UserDrawer: React.FC<{
-  open: boolean;
+export const UserProfileSettings: React.FC<{
   user: User;
-  onClose: () => void;
   onLogout: () => Promise<void> | void;
   onRefreshAuth: () => Promise<void> | void;
   onReloadProfile?: () => Promise<void> | void;
   onNavigate: (tab: TabKey) => void;
-}> = ({ open, user, onClose, onLogout, onRefreshAuth, onReloadProfile, onNavigate }) => {
+  theme: 'light' | 'dark';
+  setTheme: React.Dispatch<React.SetStateAction<'light' | 'dark'>>;
+}> = ({ user, onLogout, onRefreshAuth, onReloadProfile, onNavigate, theme, setTheme }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
   const [profileDraft, setProfileDraft] = useState<{ name: string; username: string; avatarUrl: string }>({
     name: user.name || '',
@@ -54,16 +54,14 @@ export const UserDrawer: React.FC<{
   const verified = Boolean(user.verified);
 
   useEffect(() => {
-    if (!open) return;
     setProfileDraft({
       name: user.name || '',
       username: user.username || '',
       avatarUrl: user.avatarUrl || '',
     });
-  }, [open, user.avatarUrl, user.name, user.username]);
+  }, [user.avatarUrl, user.name, user.username]);
 
   useEffect(() => {
-    if (!open) return;
     (async () => {
       try {
         const p = await apiService.getMyPrivacy();
@@ -80,18 +78,7 @@ export const UserDrawer: React.FC<{
         setError(getAxiosErrorMessage(e));
       }
     })();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  }, []);
 
   const saveProfile = async () => {
     setNotice('');
@@ -271,11 +258,7 @@ export const UserDrawer: React.FC<{
       : /^\d{6}$/.test(deleteConfirmCode.trim());
 
   return (
-    <div className={s.backdrop} onMouseDown={onClose} role="dialog" aria-modal="true">
-      <div
-        className={[s.sheet, isMobile ? s.sheetMobile : s.sheetDesktop].join(' ')}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <div className={s.profileContainer}>
         <div className={s.sheetHeader}>
           <div className={s.identityRow}>
             <div className={s.avatar} aria-hidden="true">
@@ -298,9 +281,6 @@ export const UserDrawer: React.FC<{
             </div>
           </div>
 
-          <button type="button" className={s.closeBtn} onClick={onClose} aria-label="Close profile">
-            ✕
-          </button>
         </div>
 
         {notice ? <div className={s.notice}>{notice}</div> : null}
@@ -610,7 +590,21 @@ export const UserDrawer: React.FC<{
             </div>
           </div>
         </div>
-      </div>
+
+        <div className={s.section}>
+          <div className={s.sectionTitle}>Preferences & Session</div>
+          <div className={[s.actionGrid, isMobile ? s.actionGridMobile : ''].filter(Boolean).join(' ')}>
+            <button className={s.secondaryButton} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              Theme: {theme === 'dark' ? 'Dark' : 'Light'}
+            </button>
+            <button className={s.secondaryButton} onClick={onRefreshAuth}>
+              Refresh Auth
+            </button>
+            <button className={s.dangerButton} onClick={onLogout}>
+              Logout
+            </button>
+          </div>
+        </div>
     </div>
   );
 };

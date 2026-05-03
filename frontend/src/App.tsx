@@ -8,7 +8,7 @@ import { SecurityPanel } from './components/SecurityPanel';
 import { RiskPanel } from './components/RiskPanel';
 import { AdminPage } from './components/AdminPage';
 import { ModeratorPage } from './components/ModeratorPage';
-import { UserDrawer } from './components/UserPage';
+import { UserProfileSettings } from './components/UserPage';
 import { ChatsPanel } from './components/ChatsPanel';
 import { SupportPanel } from './components/SupportPanel';
 import { useControlCenterData } from './hooks/useControlCenterData';
@@ -23,7 +23,7 @@ import {
   RTCAnswerData,
   RTCICECandidateData,
 } from './types';
-import { Users, Phone, MessageCircle, Settings as SettingsIcon } from 'lucide-react';
+import { Users, Phone, MessageCircle, Settings as SettingsIcon, Menu } from 'lucide-react';
 
 type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic' | 'showcase';
 type ThemeMode = 'light' | 'dark';
@@ -90,7 +90,7 @@ export const App: React.FC = () => {
   const activeTabRef = useRef<TabKey>('calls');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const currentUserRef = useRef<User | null>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('theme') as ThemeMode | null;
     if (saved === 'light' || saved === 'dark') return saved;
@@ -904,8 +904,8 @@ export const App: React.FC = () => {
   const accessToken = localStorage.getItem('accessToken') || '';
 
   return (
-    <div className={s.appShell}>
-      <aside className={s.sidebar}>
+    <div className={[s.appShell, isSidebarCollapsed ? s.appShellCollapsed : ''].join(' ')}>
+      <aside className={[s.sidebar, isSidebarCollapsed ? s.sidebarHidden : ''].join(' ')}>
         <div className={s.brand}>
           <div className={s.brandDot} />
           <div className={s.brandText}>
@@ -917,7 +917,7 @@ export const App: React.FC = () => {
         <div className={s.nav}>
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'chats'} label="Chats" onClick={() => setActiveTab('chats')} />
-          <NavItem active={activeTab === 'security'} label="Security" onClick={() => setActiveTab('security')} />
+          <NavItem active={activeTab === 'security'} label="Settings" onClick={() => setActiveTab('security')} />
           <NavItem active={activeTab === 'risk'} label="Risk" onClick={() => setActiveTab('risk')} />
           {!isAdmin && isModeratorLike && (
             <NavItem active={activeTab === 'moderator'} label="Moderator" onClick={() => setActiveTab('moderator')} />
@@ -928,36 +928,22 @@ export const App: React.FC = () => {
           <NavItem active={activeTab === 'showcase'} label="Security Demo" onClick={() => setActiveTab('showcase')} />
         </div>
 
-        <div className={s.sidebarFooter}>
-          <button type="button" className={s.profileBtn} onClick={() => setProfileOpen(true)} title="Profile">
-            <span className={s.profileAvatar} aria-hidden="true">
-              {(currentUser.username?.[0] || 'U').toUpperCase()}
-            </span>
-            <span className={s.profileText}>
-              <span className={s.profileName}>{currentUser.username}</span>
-              <span className={s.profileMeta}>{currentUser.role || 'user'}</span>
-            </span>
-          </button>
-        </div>
       </aside>
 
       <main className={s.main}>
         <div className={s.topbar}>
           <div className={s.topbarLeft}>
-            <div className={s.topbarTitle}>{activeTab.toUpperCase()}</div>
-            <div className={s.topbarHint}>DIP Control Center</div>
-          </div>
-          <div className={s.topbarActions}>
-            <button
-              type="button"
-              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-              className={s.topbarButton}
-              title="Toggle theme"
+            <button 
+              className={s.menuToggleBtn} 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title="Toggle Menu"
             >
-              {theme === 'dark' ? 'Light' : 'Dark'}
+              <Menu size={20} />
             </button>
-            <button onClick={handleRefreshAuth} className={s.topbarButton}>Refresh</button>
-            <button onClick={handleLogout} className={s.topbarDanger}>Logout</button>
+            <div>
+              <div className={s.topbarTitle}>{activeTab.toUpperCase()}</div>
+              <div className={s.topbarHint}>DIP Control Center</div>
+            </div>
           </div>
         </div>
 
@@ -987,7 +973,17 @@ export const App: React.FC = () => {
           )}
 
           {activeTab === 'security' && (
-            <SecurityPanel
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <UserProfileSettings
+                user={currentUser}
+                onLogout={handleLogout}
+                onRefreshAuth={handleRefreshAuth}
+                onReloadProfile={reloadCurrentUser}
+                onNavigate={setActiveTab}
+                theme={theme}
+                setTheme={setTheme}
+              />
+              <SecurityPanel
               securitySessions={security.securitySessions}
               securityActivity={security.securityActivity}
               accountNotifications={security.accountNotifications}
@@ -1007,6 +1003,7 @@ export const App: React.FC = () => {
               onResetPassword={security.handleResetPassword}
               onMarkNotificationRead={security.markAccountNotificationRead}
             />
+            </div>
           )}
 
           {activeTab === 'risk' && (
@@ -1108,52 +1105,36 @@ export const App: React.FC = () => {
             <TunnelShowcase />
           )}
         </div>
-
-        <UserDrawer
-          open={profileOpen}
-          user={currentUser}
-          onClose={() => setProfileOpen(false)}
-          onLogout={async () => {
-            setProfileOpen(false);
-            await handleLogout();
-          }}
-          onRefreshAuth={handleRefreshAuth}
-          onReloadProfile={reloadCurrentUser}
-          onNavigate={(tab) => {
-            setActiveTab(tab);
-            setProfileOpen(false);
-          }}
-        />
         
         {/* Mobile Bottom Navigation */}
         <div className={s.mobileBottomNav}>
           <button 
-            className={[s.mobileNavItem, profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
-            onClick={() => setProfileOpen(true)}
+            className={[s.mobileNavItem, activeTab === 'security' ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setActiveTab('security')}
           >
             <Users className={s.mobileNavIcon} size={24} />
             <span className={s.mobileNavLabel}>Контакты</span>
           </button>
           
           <button 
-            className={[s.mobileNavItem, activeTab === 'calls' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
-            onClick={() => { setActiveTab('calls'); setProfileOpen(false); }}
+            className={[s.mobileNavItem, activeTab === 'calls' ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setActiveTab('calls')}
           >
             <Phone className={s.mobileNavIcon} size={24} />
             <span className={s.mobileNavLabel}>Звонки</span>
           </button>
           
           <button 
-            className={[s.mobileNavItem, activeTab === 'chats' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
-            onClick={() => { setActiveTab('chats'); setProfileOpen(false); }}
+            className={[s.mobileNavItem, activeTab === 'chats' ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setActiveTab('chats')}
           >
             <MessageCircle className={s.mobileNavIcon} size={24} />
             <span className={s.mobileNavLabel}>Чаты</span>
           </button>
           
           <button 
-            className={[s.mobileNavItem, activeTab === 'security' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
-            onClick={() => { setActiveTab('security'); setProfileOpen(false); }}
+            className={[s.mobileNavItem, activeTab === 'security' ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setActiveTab('security')}
           >
             <SettingsIcon className={s.mobileNavIcon} size={24} />
             <span className={s.mobileNavLabel}>Настройки</span>
