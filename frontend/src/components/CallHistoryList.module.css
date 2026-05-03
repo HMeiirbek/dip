@@ -1,0 +1,182 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  padding-bottom: 80px; /* space for bottom nav */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  background: var(--app-bg);
+  z-index: 10;
+}
+
+.editBtn {
+  color: var(--primary);
+  font-size: 16px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.filterTabs {
+  display: flex;
+  background: var(--panel-bg2);
+  border-radius: 8px;
+  padding: 2px;
+  flex: 0 0 auto;
+}
+
+.filterTab {
+  padding: 4px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.filterTabActive {
+  background: var(--panel-bg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.newCallBtn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-size: 17px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.newCallIcon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.subPhoneIcon {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--app-bg);
+  border-radius: 50%;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 20px 16px 8px;
+  letter-spacing: 0.05em;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.callItem {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.callItem:last-child {
+  border-bottom: none;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #50a7f2 0%, #3488de 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  flex-shrink: 0;
+}
+
+.callInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nameMissed {
+  color: var(--danger);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statusLabel {
+  font-size: 14px;
+}
+
+.rightSide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.infoBtn {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading, .empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .callItem {
+    padding: 10px 16px;
+  }
+}

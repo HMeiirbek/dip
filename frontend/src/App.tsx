@@ -25,7 +25,7 @@ import {
 } from './types';
 import { Users, Phone, MessageCircle, Settings as SettingsIcon, Menu } from 'lucide-react';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic' | 'showcase';
+type TabKey = 'contacts' | 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic' | 'showcase';
 type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
@@ -915,6 +915,7 @@ export const App: React.FC = () => {
         </div>
 
         <div className={s.nav}>
+          <NavItem active={activeTab === 'contacts'} label="Contacts" onClick={() => setActiveTab('contacts')} />
           <NavItem active={activeTab === 'calls'} label="Calls" onClick={() => setActiveTab('calls')} />
           <NavItem active={activeTab === 'chats'} label="Chats" onClick={() => setActiveTab('chats')} />
           <NavItem active={activeTab === 'security'} label="Settings" onClick={() => setActiveTab('security')} />
@@ -951,6 +952,14 @@ export const App: React.FC = () => {
         {error && <div className={s.error}>{error}</div>}
 
         <div className={s.contentWrap}>
+          {activeTab === 'contacts' && (
+            <UserList
+              currentUserId={currentUser.id}
+              onCall={initiateCall}
+              activeCallId={activeCall?.id || null}
+            />
+          )}
+
           {activeTab === 'calls' && (
             <CallsPanel
               currentUserId={currentUser.id}
@@ -965,6 +974,7 @@ export const App: React.FC = () => {
               onReject={rejectCall}
               onEnd={endCall}
               remoteStream={remoteStream}
+              onNavigate={setActiveTab}
             />
           )}
 
@@ -1109,8 +1119,8 @@ export const App: React.FC = () => {
         {/* Mobile Bottom Navigation */}
         <div className={s.mobileBottomNav}>
           <button 
-            className={[s.mobileNavItem, activeTab === 'security' ? s.mobileNavItemActive : ''].join(' ')} 
-            onClick={() => setActiveTab('security')}
+            className={[s.mobileNavItem, activeTab === 'contacts' ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setActiveTab('contacts')}
           >
             <Users className={s.mobileNavIcon} size={24} />
             <span className={s.mobileNavLabel}>Контакты</span>

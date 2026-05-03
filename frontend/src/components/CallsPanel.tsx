@@ -3,6 +3,7 @@ import { Call, CallStatus as CallStatusType } from '../types';
 import { UserList } from './UserList';
 import { CallStatus } from './CallStatus';
 import { AudioStream } from './AudioStream';
+import { CallHistoryList } from './CallHistoryList';
 import s from './CallsPanel.module.css';
 
 interface CallsPanelProps {
@@ -18,6 +19,7 @@ interface CallsPanelProps {
   onReject: () => Promise<void> | void;
   onEnd: () => Promise<void> | void;
   remoteStream: MediaStream | null;
+  onNavigate: (tab: any) => void;
 }
 
 export const CallsPanel: React.FC<CallsPanelProps> = ({
@@ -33,41 +35,48 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   onReject,
   onEnd,
   remoteStream,
+  onNavigate,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
+  const showHistory = isMobile ? callStatus === 'idle' : true;
+  const showStatus = isMobile ? callStatus !== 'idle' : true;
+
   return (
     <div className={[s.content, isMobile ? s.contentMobile : ''].filter(Boolean).join(' ')}>
-      <div className={s.leftPanel}>
-        <UserList
-          currentUserId={currentUserId}
-          onCall={onCall}
-          activeCallId={activeCallId}
-        />
-      </div>
-
-      <div className={s.rightPanel}>
-        <div className={s.statusSection}>
-          <CallStatus
-            status={callStatus}
-            activeCall={activeCall}
-            incomingCall={incomingCall}
-            remoteUsername={remoteUsername}
-            canAccept={canAcceptIncoming}
-            onAccept={onAccept}
-            onReject={onReject}
-            onEnd={onEnd}
+      {showHistory && (
+        <div className={s.leftPanel}>
+          <CallHistoryList
+            currentUserId={currentUserId}
+            onNewCall={() => onNavigate('contacts')}
           />
         </div>
+      )}
 
-        {callStatus === 'active' && remoteStream && (
-          <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}>
-            <AudioStream
-              stream={remoteStream}
-              isMuted={false}
+      {showStatus && (
+        <div className={s.rightPanel}>
+          <div className={s.statusSection}>
+            <CallStatus
+              status={callStatus}
+              activeCall={activeCall}
+              incomingCall={incomingCall}
+              remoteUsername={remoteUsername}
+              canAccept={canAcceptIncoming}
+              onAccept={onAccept}
+              onReject={onReject}
+              onEnd={onEnd}
             />
           </div>
-        )}
-      </div>
+
+          {callStatus === 'active' && remoteStream && (
+            <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}>
+              <AudioStream
+                stream={remoteStream}
+                isMuted={false}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -140,10 +140,14 @@ const UserRow = React.memo(
   }) => (
     <div className={s.userItem}>
       <div className={s.userInfo}>
-        <span className={s.userAvatar} aria-hidden="true">👤</span>
+        <div className={s.userAvatar} aria-hidden="true">
+          {(user.username?.[0] || 'U').toUpperCase()}
+        </div>
         <div className={s.userMeta}>
           <span className={s.username}>{user.username}</span>
-          <small className={s.onlineMeta}>{isUserOnline(user) ? 'online' : 'offline'}</small>
+          <small className={s.onlineMeta} style={{ color: isUserOnline(user) ? 'var(--primary)' : 'var(--muted)' }}>
+            {isUserOnline(user) ? 'в сети' : 'был(а) недавно'}
+          </small>
         </div>
       </div>
       <CallButton
