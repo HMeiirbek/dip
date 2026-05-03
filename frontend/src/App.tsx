@@ -13,6 +13,7 @@ import { ChatsPanel } from './components/ChatsPanel';
 import { SupportPanel } from './components/SupportPanel';
 import { useControlCenterData } from './hooks/useControlCenterData';
 import { TrafficVisualizer } from './components/TrafficVisualizer';
+import { TunnelShowcase } from './components/TunnelShowcase';
 import s from './App.module.css';
 import {
   User,
@@ -22,8 +23,9 @@ import {
   RTCAnswerData,
   RTCICECandidateData,
 } from './types';
+import { Users, Phone, MessageCircle, Settings as SettingsIcon } from 'lucide-react';
 
-type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic';
+type TabKey = 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic' | 'showcase';
 type ThemeMode = 'light' | 'dark';
 
 const parseCsv = (value?: string) =>
@@ -923,6 +925,7 @@ export const App: React.FC = () => {
           {isAdmin && (
             <NavItem active={activeTab === 'admin'} label="Admin" onClick={() => setActiveTab('admin')} />
           )}
+          <NavItem active={activeTab === 'showcase'} label="Security Demo" onClick={() => setActiveTab('showcase')} />
         </div>
 
         <div className={s.sidebarFooter}>
@@ -1100,6 +1103,10 @@ export const App: React.FC = () => {
           {activeTab === 'traffic' && (
             <TrafficVisualizer />
           )}
+
+          {activeTab === 'showcase' && (
+            <TunnelShowcase />
+          )}
         </div>
 
         <UserDrawer
@@ -1117,6 +1124,41 @@ export const App: React.FC = () => {
             setProfileOpen(false);
           }}
         />
+        
+        {/* Mobile Bottom Navigation */}
+        <div className={s.mobileBottomNav}>
+          <button 
+            className={[s.mobileNavItem, profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => setProfileOpen(true)}
+          >
+            <Users className={s.mobileNavIcon} size={24} />
+            <span className={s.mobileNavLabel}>Контакты</span>
+          </button>
+          
+          <button 
+            className={[s.mobileNavItem, activeTab === 'calls' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => { setActiveTab('calls'); setProfileOpen(false); }}
+          >
+            <Phone className={s.mobileNavIcon} size={24} />
+            <span className={s.mobileNavLabel}>Звонки</span>
+          </button>
+          
+          <button 
+            className={[s.mobileNavItem, activeTab === 'chats' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => { setActiveTab('chats'); setProfileOpen(false); }}
+          >
+            <MessageCircle className={s.mobileNavIcon} size={24} />
+            <span className={s.mobileNavLabel}>Чаты</span>
+          </button>
+          
+          <button 
+            className={[s.mobileNavItem, activeTab === 'security' && !profileOpen ? s.mobileNavItemActive : ''].join(' ')} 
+            onClick={() => { setActiveTab('security'); setProfileOpen(false); }}
+          >
+            <SettingsIcon className={s.mobileNavIcon} size={24} />
+            <span className={s.mobileNavLabel}>Настройки</span>
+          </button>
+        </div>
       </main>
     </div>
   );

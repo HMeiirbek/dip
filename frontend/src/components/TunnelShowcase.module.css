@@ -1,0 +1,228 @@
+.container {
+  padding: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+.card {
+  background: rgba(23, 23, 23, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 60px;
+}
+
+.titleGroup h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0;
+  background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  color: #9ca3af;
+  margin-top: 8px;
+}
+
+.toggleContainer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  border-radius: 100px;
+}
+
+.toggleBtn {
+  padding: 10px 24px;
+  border-radius: 100px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggleBtnActive {
+  background: #3b82f6;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+
+.visualization {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 300px;
+  position: relative;
+  margin: 80px 0;
+}
+
+.node {
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 2;
+  transition: all 0.5s ease;
+}
+
+.nodeActive {
+  border-color: #3b82f6;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+}
+
+.nodeLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #9ca3af;
+}
+
+.pathContainer {
+  flex: 1;
+  height: 120px;
+  position: relative;
+  margin: 0 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pathLine {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tunnel {
+  position: absolute;
+  width: 100%;
+  height: 60px;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.1) 50%, rgba(59, 130, 246, 0) 100%);
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  opacity: 0;
+  transition: all 0.5s ease;
+  overflow: hidden;
+}
+
+.tunnelActive {
+  opacity: 1;
+  height: 80px;
+}
+
+.particle {
+  position: absolute;
+  width: 12px;
+  height: 4px;
+  border-radius: 4px;
+  background: #3b82f6;
+  filter: blur(1px);
+  animation: flow 2s linear infinite;
+}
+
+.particleInsecure {
+  background: #f87171;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+  animation: jitterFlow 2s linear infinite;
+}
+
+.particleSecure {
+  background: #3b82f6;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+  width: 20px;
+  height: 6px;
+  border-radius: 100px;
+}
+
+@keyframes flow {
+  from { left: -50px; opacity: 1; }
+  to { left: 110%; opacity: 0; }
+}
+
+@keyframes jitterFlow {
+  0% { left: -50px; transform: translateY(0); opacity: 1; }
+  25% { transform: translateY(-10px); }
+  50% { transform: translateY(10px); }
+  75% { transform: translateY(-5px); }
+  100% { left: 110%; transform: translateY(0); opacity: 0; }
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 60px;
+}
+
+.infoCard {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.infoIcon {
+  color: #3b82f6;
+  margin-bottom: 16px;
+}
+
+.infoTitle {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.infoText {
+  font-size: 14px;
+  color: #9ca3af;
+  line-height: 1.6;
+}
+
+.metrics {
+  display: flex;
+  gap: 32px;
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metricItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.metricValue {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricLabel {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-top: 4px;
+}

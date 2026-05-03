@@ -37,9 +37,7 @@ export const AudioStream: React.FC<AudioStreamProps> = ({
         ref={audioRef}
         autoPlay
         playsInline
-        controls
         muted={isMuted}
-        style={{ width: '100%', borderRadius: '12px' }}
       />
       {autoplayFailed && (
         <button

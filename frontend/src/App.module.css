@@ -265,40 +265,19 @@
   font-weight: 700;
 }
 
+.mobileBottomNav {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .appShell {
     grid-template-columns: 1fr;
     min-height: 100dvh;
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
 
   .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    overflow-x: auto;
-    padding-bottom: max(8px, env(safe-area-inset-bottom, 0));
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .nav {
-    flex-direction: row;
-    gap: 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .navItem {
-    width: auto;
-    flex: 0 0 auto;
-  }
-
-  .sidebarFooter {
-    margin-top: 0;
-    padding-top: 0;
-    margin-left: auto;
+    display: none;
   }
 
   .main {
@@ -308,12 +287,58 @@
   }
 
   .contentWrap {
-    min-height: min(70dvh, 720px);
-    padding-bottom: max(12px, env(safe-area-inset-bottom, 0));
+    min-height: calc(100dvh - 160px);
   }
 
   .topbar {
     flex-wrap: wrap;
+  }
+
+  .mobileBottomNav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--topbar-bg);
+    border-top: 1px solid var(--border);
+    z-index: 50;
+    padding: 8px 10px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    justify-content: space-around;
+    backdrop-filter: blur(14px);
+  }
+
+  .mobileNavItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    flex: 1;
+    transition: color 150ms ease, transform 150ms ease;
+  }
+
+  .mobileNavItem:active {
+    transform: scale(0.95);
+  }
+
+  .mobileNavItemActive {
+    color: var(--primary);
+  }
+
+  .mobileNavIcon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2px;
+  }
+
+  .mobileNavLabel {
+    font-size: 11px;
+    font-weight: 700;
   }
 }
 

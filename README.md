@@ -1,45 +1,71 @@
-# DIP - Secure Voice Signaling and Call Monitoring (Prototype)
+# DIP - Secure Voice Signaling and Advanced Call Monitoring
 
-DIP is a privacy-focused WebRTC voice calling prototype with a NestJS signaling server, JWT-authenticated REST and WebSocket APIs, and PostgreSQL persistence for calls, sessions, risk signals, moderation, and quality metrics. Media flows peer-to-peer; the server never receives raw audio.
+DIP is a robust, privacy-centric WebRTC voice communication platform designed as a research prototype for secure peer-to-peer calling. It features a NestJS-powered signaling server, real-time quality monitoring, ML-driven threat detection, and advanced risk scoring to ensure secure and reliable communication.
 
-## Features
+## 🚀 Key Features
 
-- WebRTC media with DTLS/SRTP encryption in transit
-- JWT auth for REST APIs and WSS signaling
-- Call lifecycle tracking (pending, accepted, rejected, active, ended)
-- Admin and moderation endpoints (flags, force-end, SLA summary)
-- Quality metrics capture (RTT, jitter, packet loss) and acceptance report
-- STUN/TURN support, including TURN over TLS 443
-- Optional E2EE via Insertable Streams (not enabled by default)
+- **End-to-End Secure Media**: Peer-to-peer audio streams encrypted with DTLS/SRTP. The signaling server never touches raw audio data.
+- **Advanced Signaling**: JWT-authenticated WebSocket signaling (Socket.io) with strict session management.
+- **ML-Monitoring & Risk Scoring**: Real-time analysis of call patterns and network metadata using machine learning to detect anomalies and fraudulent behavior.
+- **Anti-Fraud System**: Integrated blacklisting and risk-based moderation tools for administrators.
+- **Network Traffic Visualizer**: Built-in tool for analyzing PCAP/Wireshark data, demonstrating traffic patterns and obfuscation techniques (TCP Cloaking).
+- **Quality of Service (QoS)**: Comprehensive metrics collection including RTT, jitter, and packet loss with automated acceptance reporting.
+- **Resilient Connectivity**: Full STUN/TURN support, including TURN over TLS (port 443) for bypass restricted firewalls.
 
-## Requirements
+## 🛠 Project Structure
 
-- Node.js 18+
-- Docker + docker-compose (local PostgreSQL)
-- Modern browser with WebRTC support
+```text
+dip/
+├── backend/                # NestJS signaling & management server
+│   ├── src/
+│   │   ├── admin/          # Moderation & SLA reporting
+│   │   ├── auth/           # JWT & Session logic
+│   │   ├── blacklist/      # Anti-fraud blacklisting
+│   │   ├── calls/          # Call lifecycle management
+│   │   ├── ml/             # ML-driven monitoring & anomaly detection
+│   │   ├── risk/           # Real-time risk scoring
+│   │   ├── ws/             # WebSocket signaling gateway
+│   │   └── prisma/         # Database persistence layer
+├── frontend/               # React-based WebRTC client & Admin Dashboard
+│   ├── src/
+│   │   ├── components/     # UI Components (TrafficVisualizer, CallInterface, etc.)
+│   │   ├── services/       # API & Socket clients
+│   │   └── utils/          # PCAP parsing & network math
+├── docs/                   # Technical specifications & architecture diagrams
+├── deployment/             # Docker & CI/CD configuration
+└── scripts/                # Utility scripts for maintenance and reporting
+```
 
-## Quick Start
+## 📋 Requirements
 
-### 1) Start the database
+- **Node.js**: v18.0 or higher
+- **PostgreSQL**: v14+ (via Docker or local installation)
+- **Docker & Docker Compose**: For local environment setup
+
+## 🚦 Quick Start
+
+### 1. Environment Setup
+
+Copy `.env.example` to `.env` in both `backend/` and `frontend/` directories and adjust variables as needed.
+
+### 2. Launch Infrastructure
 
 ```bash
-cd /home/mq/dip
+# Start PostgreSQL
 docker-compose up -d postgres
 ```
 
-### 2) Start backend (NestJS)
+### 3. Start Backend
 
 ```bash
 cd backend
 npm install
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:migrate:dev
 npm run start:dev
 ```
 
-Default API base: `http://localhost:3000/api/v1`
-
-### 3) Start frontend (React)
+### 4. Start Frontend
 
 ```bash
 cd frontend
@@ -47,122 +73,36 @@ npm install
 npm start
 ```
 
-The React dev server uses port 3000 by default. If backend is already on 3000, the frontend will switch to 3001.
+Default access:
+- **API**: `http://localhost:3000/api/v1`
+- **Web UI**: `http://localhost:3001` (or 3000 if backend is on another port)
 
-## Configuration
+## 📊 Security & Monitoring
 
-### Backend environment
-
-Use `backend/.env.example` as a template.
-
-Required:
-- `DATABASE_URL` (PostgreSQL)
-- `JWT_SECRET`
-
-Optional:
-- `CORS_ORIGIN` (comma-separated list of allowed origins)
-- `ENFORCE_SECURE_SIGNALING` (`true` to reject non-HTTPS/WSS)
-
-Example:
-
-```bash
-DATABASE_URL="postgresql://user:pass@host:5432/db"
-JWT_SECRET="change-me"
-CORS_ORIGIN="http://localhost:3001,https://your-domain"
-ENFORCE_SECURE_SIGNALING="false"
-```
-
-### Frontend environment
-
-Use `frontend/.env.example` as a template (or create `frontend/.env.local`).
-
-Required:
-- `REACT_APP_API_URL`
-- `REACT_APP_SOCKET_URL`
-
-Optional ICE / TURN:
-
-```bash
-REACT_APP_STUN_URLS=stun:stun.l.google.com:19302
-REACT_APP_TURN_URLS=turns:turn.example.com:443?transport=tcp
-REACT_APP_TURN_USERNAME=turn-user
-REACT_APP_TURN_CREDENTIAL=turn-password
-# Optional full JSON override (takes precedence)
-# REACT_APP_ICE_SERVERS_JSON=[{"urls":["stun:stun.l.google.com:19302"]}]
-```
-
-## Acceptance Report
-
-Generate a measurable acceptance report from DB data:
-
+### Acceptance Reporting
+Generate a detailed KPI report based on database metrics:
 ```bash
 cd backend
 npm run acceptance:report
 ```
 
-The report includes:
-- Call setup KPI (p95, percent <= 8s)
-- Quality KPI in last 24h (RTT, jitter, packet loss)
-- PASS or PARTIAL summary
+### ML Monitoring
+The system tracks runtime model accuracy and drift. Status can be checked via:
+- `GET /api/v1/ml/status`
+- `GET /api/v1/ml/metrics`
 
-## Admin and Moderation (selected endpoints)
+### Risk Analysis
+Each user and call session is assigned a risk score based on historical behavior and real-time signals:
+- `GET /api/v1/risk/stats`
+- `GET /api/v1/risk/monitor`
 
-- `GET /api/v1/admin/moderation/overview`
-- `GET /api/v1/admin/calls/flags`
-- `POST /api/v1/admin/calls/:id/flag`
-- `POST /api/v1/admin/calls/:id/flags/resolve-all`
-- `POST /api/v1/admin/calls/:id/force-end`
-- `GET /api/v1/admin/sla-summary`
+## 📖 Documentation
 
-All admin routes require JWT and appropriate roles (`admin` or `moderator`).
+For more detailed information, please refer to the `docs/` directory:
+- [System Architecture](docs/architecture/system-architecture.md)
+- [Security Specifications](docs/security/privacy-audio-traffic-module-spec.md)
+- [Backend API Reference](docs/api/backend-api.md)
 
-## Project Structure
+## 🔒 License
 
-```
-dip/
-├── backend/                 # NestJS signaling server
-│   ├── src/
-│   │   ├── auth/
-│   │   ├── users/
-│   │   ├── calls/
-│   │   ├── ws/              # WebSocket signaling
-│   │   ├── admin/           # moderation + SLA summary
-│   │   ├── risk/            # risk APIs
-│   │   ├── notifications/
-│   │   ├── messages/
-│   │   └── prisma/
-│   ├── prisma/
-│   └── scripts/
-├── frontend/                # React UI & WebRTC client
-│   ├── src/
-│   │   ├── components/
-│   │   ├── services/
-│   │   └── App.tsx
-├── docs/
-├── deployment/
-├── tests/
-└── docker-compose.yml
-```
-
-## Documentation
-
-- `docs/quick-start.md`
-- `docs/architecture/system-architecture.md`
-- `docs/api/backend-api.md`
-- `docs/security/`
-- `docs/reports/checkup-report.md`
-
-## Troubleshooting
-
-### getUserMedia is undefined on mobile
-WebRTC requires a secure context. Use HTTPS and WSS or a tunnel that terminates TLS.
-
-### CORS errors
-Set `CORS_ORIGIN` on the backend to match the frontend origin and restart the server.
-
-### WebSocket auth failures
-Ensure the JWT is passed in the socket handshake `auth` field and the backend accepts the token.
-
-## License
-
-Research prototype. See LICENSE in repository root.
+This project is a research prototype. See the [LICENSE](LICENSE) file for details.
