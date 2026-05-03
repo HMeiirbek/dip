@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, Globe, Server, ArrowRight, EyeOff, Zap } from 'lucide-react';
+import { Shield, Lock, Globe, Server, EyeOff } from 'lucide-react';
 import s from './TunnelShowcase.module.css';
 
 export const TunnelShowcase: React.FC = () => {
