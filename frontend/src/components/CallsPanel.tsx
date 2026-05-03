@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Call, CallStatus as CallStatusType } from '../types';
-import { UserList } from './UserList';
 import { CallStatus } from './CallStatus';
 import { AudioStream } from './AudioStream';
 import { CallHistoryList } from './CallHistoryList';
@@ -8,8 +7,6 @@ import s from './CallsPanel.module.css';
 
 interface CallsPanelProps {
   currentUserId: string;
-  onCall: (userId: string) => Promise<void>;
-  activeCallId: string | null;
   callStatus: CallStatusType;
   activeCall: Call | null;
   incomingCall: Call | null;
@@ -24,8 +21,6 @@ interface CallsPanelProps {
 
 export const CallsPanel: React.FC<CallsPanelProps> = ({
   currentUserId,
-  onCall,
-  activeCallId,
   callStatus,
   activeCall,
   incomingCall,

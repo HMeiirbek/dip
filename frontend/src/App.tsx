@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import apiService, { getAxiosErrorMessage } from './services/api';
 import socketService from './services/socket';
 import { LoginForm } from './components/LoginForm';
+import { UserList } from './components/UserList';
 import { CallsPanel } from './components/CallsPanel';
 import { SecurityPanel } from './components/SecurityPanel';
 import { RiskPanel } from './components/RiskPanel';
@@ -963,8 +964,6 @@ export const App: React.FC = () => {
           {activeTab === 'calls' && (
             <CallsPanel
               currentUserId={currentUser.id}
-              onCall={initiateCall}
-              activeCallId={activeCall?.id || null}
               callStatus={callStatus}
               activeCall={activeCall}
               incomingCall={incomingCall}
