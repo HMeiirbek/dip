@@ -73,9 +73,15 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private resolveCounterpartyUserId(
-    call: { callerId: string; calleeId: string },
+    call: any,
     senderId: string,
   ) {
+    if (call.hostId && call.participants) {
+      if (call.hostId === senderId) {
+        return call.participants.find((p: any) => p.userId !== senderId)?.userId || null;
+      }
+      return call.hostId;
+    }
     return call.callerId === senderId ? call.calleeId : call.callerId;
   }
 

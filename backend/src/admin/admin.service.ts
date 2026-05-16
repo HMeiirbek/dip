@@ -792,8 +792,11 @@ export class AdminService {
         Math.floor((Date.now() - new Date(started).getTime()) / 1000),
       );
 
-      const callerSession = sessionById.get(call.callerId);
-      const calleeSession = sessionById.get(call.calleeId);
+      const callerId = call.hostId;
+      const calleeParticipant = call.participants.find((p) => p.userId !== call.hostId);
+      const calleeId = calleeParticipant ? calleeParticipant.userId : call.hostId;
+      const callerSession = sessionById.get(callerId);
+      const calleeSession = sessionById.get(calleeId);
       const quality = qualityByCallId.get(call.id);
 
       return {
@@ -801,7 +804,7 @@ export class AdminService {
         status: call.status,
         createdAt: call.createdAt,
         startedAt: call.startedAt,
-        expiresAt: call.expiresAt,
+        expiresAt: undefined,
         durationSec,
         quality: quality
           ? {
@@ -814,16 +817,16 @@ export class AdminService {
             }
           : null,
         caller: {
-          id: call.callerId,
-          username: call.caller?.username || call.callerId,
-          online: onlineSet.has(call.callerId),
+          id: callerId,
+          username: call.host?.username || callerId,
+          online: onlineSet.has(callerId),
           ipAddress: callerSession?.ip_address || 'unknown',
           deviceInfo: callerSession?.device_info || 'unknown',
         },
         callee: {
-          id: call.calleeId,
-          username: call.callee?.username || call.calleeId,
-          online: onlineSet.has(call.calleeId),
+          id: calleeId,
+          username: calleeParticipant?.user?.username || calleeId,
+          online: onlineSet.has(calleeId),
           ipAddress: calleeSession?.ip_address || 'unknown',
           deviceInfo: calleeSession?.device_info || 'unknown',
         },
@@ -984,11 +987,11 @@ export class AdminService {
 
   async callQualityHistory(callId: string, limit = 120) {
     const safeLimit = Math.max(20, Math.min(600, Number(limit) || 120));
-    const call = await this.prisma.call.findUnique({
+    const call = await this.prisma.room.findUnique({
       where: { id: callId },
       include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
+        host: { select: { id: true, username: true } },
+        participants: { include: { user: { select: { id: true, username: true } } } },
       },
     });
 
@@ -1013,7 +1016,7 @@ export class AdminService {
     >(
       `SELECT created_at, user_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps
        FROM call_quality_metrics
-       WHERE call_id = $1
+       WHERE room_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
       callId,
@@ -1035,7 +1038,7 @@ export class AdminService {
       >(
         `SELECT id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
          FROM moderation_call_flags
-         WHERE call_id = $1
+         WHERE room_id = $1
          ORDER BY created_at DESC
          LIMIT 200`,
         callId,
@@ -1095,19 +1098,25 @@ export class AdminService {
       metadata?: Record<string, unknown>;
     }> = [];
 
+    const callerId = call.hostId;
+    const callerName = call.host?.username || call.hostId;
+    const calleeParticipant = call.participants.find((p) => p.userId !== call.hostId);
+    const calleeId = calleeParticipant ? calleeParticipant.userId : call.hostId;
+    const calleeName = calleeParticipant?.user?.username || calleeId;
+
     timeline.push({
       at: call.createdAt,
       type: 'call.created',
-      actorId: call.callerId,
-      actorName: call.caller?.username || call.callerId,
+      actorId: callerId,
+      actorName: callerName,
       message: 'Call created',
     });
     if (call.startedAt) {
       timeline.push({
         at: call.startedAt,
         type: 'call.started',
-        actorId: call.calleeId,
-        actorName: call.callee?.username || call.calleeId,
+        actorId: calleeId,
+        actorName: calleeName,
         message: 'Call started/accepted',
       });
     }
@@ -1166,8 +1175,8 @@ export class AdminService {
       call: {
         id: call.id,
         status: call.status,
-        caller: call.caller,
-        callee: call.callee,
+        caller: { id: callerId, username: callerName },
+        callee: { id: calleeId, username: calleeName },
         createdAt: call.createdAt,
         startedAt: call.startedAt,
       },
@@ -1192,7 +1201,7 @@ export class AdminService {
   }
 
   async forceEndCall(callId: string, actorId: string, actorRole: string) {
-    const call = await this.prisma.call.findUnique({ where: { id: callId } });
+    const call = await this.prisma.room.findUnique({ where: { id: callId }, include: { participants: true } });
     if (!call) throw new NotFoundException('Call not found');
 
     if (!['pending', 'accepted', 'active'].includes(call.status)) {
@@ -1200,7 +1209,7 @@ export class AdminService {
     }
 
     const endedAt = new Date();
-    const updated = await this.prisma.call.update({
+    const updated = await this.prisma.room.update({
       where: { id: callId },
       data: {
         status: 'ended',
@@ -1218,8 +1227,8 @@ export class AdminService {
 
     this.callEvents.emitEnded({
       callId: updated.id,
-      callerId: updated.callerId,
-      calleeId: updated.calleeId,
+      callerId: call.hostId,
+      calleeId: call.participants.find(p => p.userId !== call.hostId)?.userId || call.hostId,
       reason: 'force-ended-by-moderator',
       endedBy: actorId,
     });
@@ -1233,7 +1242,7 @@ export class AdminService {
   }
 
   async flagCall(callId: string, actorId: string, actorRole: string, reason?: string) {
-    const call = await this.prisma.call.findUnique({
+    const call = await this.prisma.room.findUnique({
       where: { id: callId },
       select: { id: true, status: true },
     });
@@ -1243,7 +1252,7 @@ export class AdminService {
     const flagId = crypto.randomUUID();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO moderation_call_flags
-        (id, call_id, actor_id, actor_role, reason, status, created_at)
+        (id, room_id, actor_id, actor_role, reason, status, created_at)
        VALUES
         ($1, $2, $3, $4, $5, 'open', NOW())`,
       flagId,
@@ -1308,7 +1317,7 @@ export class AdminService {
       const p2 = pushParam(like);
       const p3 = pushParam(like);
       const p4 = pushParam(like);
-      whereClauses.push(`(call_id ILIKE ${p1} OR reason ILIKE ${p2} OR actor_role ILIKE ${p3} OR actor_id ILIKE ${p4})`);
+      whereClauses.push(`(room_id ILIKE ${p1} OR reason ILIKE ${p2} OR actor_role ILIKE ${p3} OR actor_id ILIKE ${p4})`);
     }
 
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -1328,7 +1337,7 @@ export class AdminService {
         resolved_by: string | null;
       }>
     >(
-      `SELECT id, call_id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
+      `SELECT id, room_id as call_id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
        FROM moderation_call_flags
        ${whereSql}
        ORDER BY ${orderColumn} ${sortDir}, created_at DESC
@@ -1347,14 +1356,13 @@ export class AdminService {
 
     const callIds = Array.from(new Set(rows.map((r) => r.call_id)));
     const calls = callIds.length
-      ? await this.prisma.call.findMany({
+      ? await this.prisma.room.findMany({
           where: { id: { in: callIds } },
           select: {
             id: true,
-            callerId: true,
-            calleeId: true,
-            caller: { select: { id: true, username: true } },
-            callee: { select: { id: true, username: true } },
+            hostId: true,
+            host: { select: { id: true, username: true } },
+            participants: { include: { user: { select: { id: true, username: true } } } },
           },
         })
       : [];
@@ -1362,6 +1370,14 @@ export class AdminService {
 
     const items = rows.map((row) => {
       const callData = callsById.get(row.call_id);
+      let caller = undefined;
+      let callee = undefined;
+      if (callData) {
+        caller = { id: callData.hostId, username: callData.host?.username || callData.hostId };
+        const calleeParticipant = callData.participants.find(p => p.userId !== callData.hostId);
+        const calleeId = calleeParticipant ? calleeParticipant.userId : callData.hostId;
+        callee = { id: calleeId, username: calleeParticipant?.user?.username || calleeId };
+      }
       return {
         id: row.id,
         callId: row.call_id,
@@ -1372,18 +1388,7 @@ export class AdminService {
         createdAt: row.created_at,
         resolvedAt: row.resolved_at,
         resolvedBy: row.resolved_by,
-        call: callData
-          ? {
-              caller: {
-                id: callData.callerId,
-                username: callData.caller?.username || callData.callerId,
-              },
-              callee: {
-                id: callData.calleeId,
-                username: callData.callee?.username || callData.calleeId,
-              },
-            }
-          : null,
+        call: callData ? { caller, callee } : null,
       };
     });
 
@@ -1463,7 +1468,7 @@ export class AdminService {
 
   async analytics() {
     const [calls, users] = await Promise.all([
-      this.prisma.call.findMany({
+      this.prisma.room.findMany({
         orderBy: { createdAt: 'desc' },
         take: 2000,
         select: { status: true, createdAt: true },
@@ -1501,7 +1506,7 @@ export class AdminService {
   }
 
   async slaSummary() {
-    const calls = await this.prisma.call.findMany({
+    const calls = await this.prisma.room.findMany({
       orderBy: { createdAt: 'desc' },
       take: 3000,
       select: {

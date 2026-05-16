@@ -28,13 +28,13 @@ export class CallsController {
     @Req() req: { user: { sub: string } },
     @Body('calleeId') calleeId: string,
   ) {
-    const call = await this.calls.create(req.user.sub, calleeId);
+    const call = await this.calls.create(req.user.sub);
 
     // notify via server-side event so WsGateway can forward to callee if online
     this.callEvents.emitIncoming({
       callId: call.id,
-      callerId: call.callerId,
-      calleeId: call.calleeId,
+      callerId: req.user.sub,
+      calleeId: calleeId,
     });
 
     return call;
@@ -62,10 +62,9 @@ export class CallsController {
     return this.calls.report(req.user.sub, phoneNumber, description);
   }
 
-  @ApiOperation({ summary: 'Get Live Call' })
   @Get('live')
   async live(@Req() req: { user: { sub: string } }) {
-    return this.calls.live(req.user.sub);
+    return this.calls.getActiveCallForUser(req.user.sub);
   }
 
   @ApiOperation({ summary: 'Accept Call' })
@@ -74,11 +73,11 @@ export class CallsController {
     @Req() req: { user: { sub: string } },
     @Param('id') id: string,
   ) {
-    const call = await this.calls.accept(id, req.user.sub);
+    const call = await this.calls.join(id, req.user.sub);
     this.callEvents.emitAccepted({
       callId: call.id,
-      callerId: call.callerId,
-      calleeId: call.calleeId,
+      callerId: call.hostId || 'unknown',
+      calleeId: req.user.sub,
     });
     return call;
   }
@@ -92,8 +91,8 @@ export class CallsController {
     const call = await this.calls.reject(id, req.user.sub);
     this.callEvents.emitRejected({
       callId: call.id,
-      callerId: call.callerId,
-      calleeId: call.calleeId,
+      callerId: 'unknown',
+      calleeId: req.user.sub,
       reason: 'rejected',
     });
     return call;
@@ -133,8 +132,8 @@ export class CallsController {
     const call = await this.calls.end(id, req.user.sub);
     this.callEvents.emitEnded({
       callId: call.id,
-      callerId: call.callerId,
-      calleeId: call.calleeId,
+      callerId: call.hostId || 'unknown',
+      calleeId: 'unknown',
       reason: 'ended-by-user',
       endedBy: req.user.sub,
     });
