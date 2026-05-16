@@ -16,7 +16,7 @@ type SecurityActivity = {
 export class SecurityService {
   private readonly refreshTtlMs = 1000 * 60 * 60 * 24 * 30;
 
-  private readonly loginBlockThreshold = 5;
+  private readonly loginBlockThreshold = 100;
   private readonly loginBlockWindowMs = 30 * 60 * 1000;
   private readonly loginBlockDurationMs = 30 * 60 * 1000;
 
