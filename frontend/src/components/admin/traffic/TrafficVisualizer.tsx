@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Network, Shield, AlertTriangle, Download } from 'lucide-react';
 import s from './TrafficVisualizer.module.css';
 import { TrafficTimeline } from './TrafficTimeline';

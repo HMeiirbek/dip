@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import s from './TrafficTimeline.module.css';
 
 interface TrafficTimelineProps {
