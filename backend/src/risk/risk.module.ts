@@ -8,5 +8,6 @@ import { BlacklistModule } from '../blacklist/blacklist.module';
   imports: [CallsModule, BlacklistModule],
   controllers: [RiskController],
   providers: [RiskService],
+  exports: [RiskService],
 })
 export class RiskModule {}
