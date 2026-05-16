@@ -27,6 +27,7 @@ export class AuthService {
     if (!normalizedUsername || !password) {
       throw new BadRequestException('Username and password required');
     }
+    this.validatePassword(password);
     const hash = await bcrypt.hash(password, 10);
     try {
       const user = await this.prisma.user.create({
@@ -66,6 +67,10 @@ export class AuthService {
         }
       }
       throw new UnauthorizedException('Authentication failed');
+    }
+
+    if (this.security.isUserBlocked(user.id)) {
+      throw new UnauthorizedException('Account temporarily blocked due to security incident');
     }
 
     const ok = await bcrypt.compare(password, user.password);
@@ -203,6 +208,8 @@ export class AuthService {
       throw new BadRequestException('Identifier, code and new password required');
     }
 
+    this.validatePassword(newPassword);
+
     const hash = await bcrypt.hash(newPassword, 10);
     const user = await this.prisma.user.findUnique({
       where: { username: identifier },
@@ -294,5 +301,19 @@ export class AuthService {
       sessionId,
       role,
     };
+  }
+
+  private validatePassword(password: string) {
+    const minLength = 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+    if (password.length < minLength || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecialChar) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
+      );
+    }
   }
 }

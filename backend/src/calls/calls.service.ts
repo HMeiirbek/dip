@@ -8,7 +8,6 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
-export type CallStatus = 'pending' | 'accepted' | 'rejected' | 'active' | 'ended';
 export type CallQualitySampleInput = {
   rttMs?: number;
   jitterMs?: number;
@@ -16,283 +15,111 @@ export type CallQualitySampleInput = {
   mosLike?: number;
   bitrateKbps?: number;
 };
+
 @Injectable()
 export class CallsService {
-  private readonly CALL_RING_TIMEOUT = 30000; // 30 seconds
   constructor(private prisma: PrismaService) {}
 
-  private isExpired(call: { expiresAt?: Date | null }, now = new Date()) {
-    return Boolean(call.expiresAt && new Date(call.expiresAt).getTime() <= now.getTime());
-  }
-
-  async create(callerId: string, calleeId: string) {
-    if (!calleeId?.trim()) {
-      throw new BadRequestException('calleeId required');
-    }
-
-    // Verify callee exists
-    const callee = await this.prisma.user.findUnique({
-      where: { id: calleeId },
-    });
-    if (!callee) {
-      throw new NotFoundException('Callee not found');
-    }
-
-    if (callerId === calleeId) {
-      throw new BadRequestException('Cannot call yourself');
-    }
-
-    const now = new Date();
-
-    // Cleanup stale calls for this pair before checking active state
-    await this.prisma.call.updateMany({
-      where: {
-        OR: [
-          { callerId, calleeId },
-          { callerId: calleeId, calleeId: callerId },
-        ],
-        status: 'pending',
-        expiresAt: { lte: now },
-      },
+  async create(hostId: string) {
+    const room = await this.prisma.room.create({
       data: {
-        status: 'rejected',
-        endedAt: now,
-      },
-    });
-
-    await this.prisma.call.updateMany({
-      where: {
-        OR: [
-          { callerId, calleeId },
-          { callerId: calleeId, calleeId: callerId },
-        ],
-        status: 'accepted',
-        expiresAt: { lte: now },
-      },
-      data: {
-        status: 'ended',
-        endedAt: now,
-      },
-    });
-
-    // Check for currently active calls between these users
-    const activeCall = await this.prisma.call.findFirst({
-      where: {
-        OR: [
-          {
-            callerId,
-            calleeId,
-            OR: [
-              { status: 'active' },
-              { status: 'pending', expiresAt: { gt: now } },
-              { status: 'accepted', expiresAt: { gt: now } },
-            ],
-          },
-          {
-            callerId: calleeId,
-            calleeId: callerId,
-            OR: [
-              { status: 'active' },
-              { status: 'pending', expiresAt: { gt: now } },
-              { status: 'accepted', expiresAt: { gt: now } },
-            ],
-          },
-        ],
-      },
-    });
-
-    if (activeCall) {
-      throw new BadRequestException('There is already an active call between these users');
-    }
-
-    const expiresAt = new Date(Date.now() + this.CALL_RING_TIMEOUT);
-    try {
-      const call = await this.prisma.call.create({
-        data: {
-          callerId,
-          calleeId,
-          status: 'pending',
-          expiresAt,
-        },
-      });
-      return call;
-    } catch (err) {
-      // handle unique constraint from DB partial index
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new BadRequestException('There is already an active call between these users');
-      }
-      throw err;
-    }
-  }
-
-  async findById(id: string, userId: string) {
-    const call = await this.prisma.call.findUnique({
-      where: { id },
-      include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
-      },
-    });
-
-    if (!call) throw new NotFoundException('Call not found');
-    if (call.callerId !== userId && call.calleeId !== userId) {
-      throw new ForbiddenException('Not a participant of this call');
-    }
-
-    return call;
-  }
-
-  async accept(id: string, userId: string) {
-    const call = await this.prisma.call.findUnique({
-      where: { id },
-    });
-
-    if (!call) throw new NotFoundException('Call not found');
-    if (call.calleeId !== userId) {
-      throw new ForbiddenException('Only the callee can accept this call');
-    }
-    if (this.isExpired(call)) {
-      await this.prisma.call.update({
-        where: { id },
-        data: {
-          status: 'rejected',
-          endedAt: new Date(),
-        },
-      });
-      throw new BadRequestException('Call has expired');
-    }
-    if (call.status === 'accepted') {
-      return call;
-    }
-    if (call.status !== 'pending') {
-      throw new BadRequestException(`Cannot accept a call with status: ${call.status}`);
-    }
-
-    return this.prisma.call.update({
-      where: { id },
-      data: {
-        status: 'accepted',
+        hostId,
+        status: 'active',
         startedAt: new Date(),
       },
     });
-  }
 
-  async reject(id: string, userId: string) {
-    const call = await this.prisma.call.findUnique({
-      where: { id },
-    });
-
-    if (!call) throw new NotFoundException('Call not found');
-    if (call.calleeId !== userId) {
-      throw new ForbiddenException('Only the callee can reject this call');
-    }
-    if (call.status !== 'pending' && call.status !== 'accepted') {
-      throw new BadRequestException(`Cannot reject a call with status: ${call.status}`);
-    }
-
-    return this.prisma.call.update({
-      where: { id },
+    // Host is the first participant
+    await this.prisma.roomParticipant.create({
       data: {
-        status: 'rejected',
-        endedAt: new Date(),
+        roomId: room.id,
+        userId: hostId,
       },
     });
+
+    return room;
   }
 
-  async markActive(id: string, userId: string) {
-    const call = await this.prisma.call.findUnique({
+  async findById(id: string, userId: string) {
+    const room = await this.prisma.room.findUnique({
       where: { id },
-    });
-
-    if (!call) throw new NotFoundException('Call not found');
-    if (call.callerId !== userId && call.calleeId !== userId) {
-      throw new ForbiddenException('Not a participant of this call');
-    }
-    if (call.status === 'active') {
-      return call;
-    }
-    if (this.isExpired(call)) {
-      await this.prisma.call.update({
-        where: { id },
-        data: {
-          status: 'ended',
-          endedAt: new Date(),
+      include: {
+        host: { select: { id: true, username: true } },
+        participants: {
+          include: {
+            user: { select: { id: true, username: true } },
+          },
         },
-      });
-      throw new BadRequestException('Cannot mark as active: call has expired');
-    }
-    if (call.status !== 'accepted') {
-      throw new BadRequestException(`Cannot mark as active: call status is ${call.status}`);
+      },
+    });
+
+    if (!room) throw new NotFoundException('Room not found');
+    
+    const isParticipant = room.participants.some(p => p.userId === userId);
+    if (!isParticipant && room.hostId !== userId) {
+      throw new ForbiddenException('Not a participant of this room');
     }
 
-    return this.prisma.call.update({
-      where: { id },
-      data: { status: 'active' },
+    return room;
+  }
+
+  async join(roomId: string, userId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id: roomId },
+      include: { participants: true },
     });
+
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.status !== 'active') {
+      throw new BadRequestException('Room is already ended');
+    }
+
+    const alreadyParticipant = room.participants.some(p => p.userId === userId);
+    if (alreadyParticipant) {
+      return room;
+    }
+
+    await this.prisma.roomParticipant.create({
+      data: {
+        roomId,
+        userId,
+      },
+    });
+
+    return this.findById(roomId, userId);
+  }
+
+  async leave(roomId: string, userId: string) {
+    await this.prisma.roomParticipant.updateMany({
+      where: {
+        roomId,
+        userId,
+        leftAt: null,
+      },
+      data: {
+        leftAt: new Date(),
+      },
+    });
+
+    // If it was the host or last participant, maybe end the room?
+    // For now, keep it simple.
   }
 
   async end(id: string, userId: string) {
-    const call = await this.prisma.call.findUnique({
+    const room = await this.prisma.room.findUnique({
       where: { id },
     });
 
-    if (!call) throw new NotFoundException('Call not found');
-    if (call.callerId !== userId && call.calleeId !== userId) {
-      throw new ForbiddenException('Not a participant of this call');
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.hostId !== userId) {
+      throw new ForbiddenException('Only the host can end the room');
     }
 
-    return this.prisma.call.update({
+    return this.prisma.room.update({
       where: { id },
       data: {
         status: 'ended',
         endedAt: new Date(),
-      },
-    });
-  }
-
-  async getPendingCallForUser(userId: string) {
-    return this.prisma.call.findFirst({
-      where: {
-        calleeId: userId,
-        status: 'pending',
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } },
-        ],
-      },
-      include: {
-        caller: { select: { id: true, username: true } },
-      },
-    });
-  }
-
-  async getActiveCallForUser(userId: string) {
-    return this.prisma.call.findFirst({
-      where: {
-        AND: [
-          {
-            OR: [
-              { callerId: userId },
-              { calleeId: userId },
-            ],
-          },
-          {
-            OR: [
-              { status: 'active' },
-              {
-                status: 'accepted',
-                OR: [
-                  { expiresAt: null },
-                  { expiresAt: { gt: new Date() } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
       },
     });
   }
@@ -329,15 +156,21 @@ export class CallsService {
   }
 
   async history(userId: string) {
-    return this.prisma.call.findMany({
+    return this.prisma.room.findMany({
       where: {
-        OR: [{ callerId: userId }, { calleeId: userId }],
+        participants: {
+          some: { userId },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
+        host: { select: { id: true, username: true } },
+        participants: {
+          include: {
+            user: { select: { id: true, username: true } },
+          },
+        },
       },
     });
   }
@@ -396,48 +229,7 @@ export class CallsService {
     }));
   }
 
-  async live(userId: string) {
-    return this.prisma.call.findFirst({
-      where: {
-        AND: [
-          {
-            OR: [{ callerId: userId }, { calleeId: userId }],
-          },
-          {
-            OR: [
-              { status: 'active' },
-              {
-                status: 'pending',
-                OR: [
-                  { expiresAt: null },
-                  { expiresAt: { gt: new Date() } },
-                ],
-              },
-              {
-                status: 'accepted',
-                OR: [
-                  { expiresAt: null },
-                  { expiresAt: { gt: new Date() } },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
-      },
-    });
-  }
-
-  async ingestQualitySample(callId: string, userId: string, sample: CallQualitySampleInput) {
-    const call = await this.findById(callId, userId);
-    if (!['pending', 'accepted', 'active'].includes(call.status)) {
-      throw new BadRequestException('Cannot ingest quality metrics for closed calls');
-    }
-
+  async ingestQualitySample(roomId: string, userId: string, sample: CallQualitySampleInput) {
     const clamp = (value: unknown, min: number, max: number) => {
       if (typeof value !== 'number' || Number.isNaN(value)) return null;
       return Math.max(min, Math.min(max, value));
@@ -445,7 +237,7 @@ export class CallsService {
 
     await this.prisma.callQualityMetrics.create({
       data: {
-        callId,
+        roomId,
         userId,
         rttMs: clamp(sample.rttMs, 0, 60000),
         jitterMs: clamp(sample.jitterMs, 0, 60000),
@@ -457,12 +249,21 @@ export class CallsService {
 
     return { success: true };
   }
-
-  private setCallTimeout(callId: string, callerId: string) {
-    // No-op: in-memory timeouts removed in favor of DB-driven cleanup
+  
+  // Compatibility methods for old P2P logic if needed
+  async getPendingCallForUser(userId: string) { return null; }
+  async getActiveCallForUser(userId: string) {
+    return this.prisma.room.findFirst({
+      where: {
+        status: 'active',
+        participants: { some: { userId } }
+      },
+      include: {
+        host: { select: { id: true, username: true } },
+        participants: { include: { user: { select: { id: true, username: true } } } }
+      }
+    });
   }
-
-  private clearCallTimeout(callId: string) {
-    // No-op: kept for compatibility but does nothing now
-  }
+  async markActive(id: string, userId: string) { return { id, status: 'active' }; }
+  async reject(id: string, userId: string) { return { id, status: 'rejected' }; }
 }

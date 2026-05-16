@@ -14,5 +14,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  coturn:
+    image: coturn/coturn:latest
+    container_name: dip_coturn
+    restart: always
+    network_mode: host
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--listening-port=3478"
+      - "--tls-listening-port=5349"
+      - "--min-port=49152"
+      - "--max-port=65535"
+      - "--user=dip_user:dip_password"
+      - "--realm=dip.local"
+      - "--verbose"
+
 volumes:
   pgdata:

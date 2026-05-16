@@ -30,6 +30,8 @@ export class SecurityService {
     }
   >();
 
+  private readonly userBlockState = new Map<string, number>();
+
   private readonly adminUsernames = new Set(
     (process.env.ADMIN_USERNAMES || '')
       .split(',')
@@ -156,6 +158,24 @@ export class SecurityService {
     if (state.blockedUntil > Date.now()) return true;
     this.failedLoginState.delete(ipAddress);
     return false;
+  }
+
+  blockUserTemporarily(userId: string, durationMs = 30 * 60 * 1000) {
+    this.userBlockState.set(userId, Date.now() + durationMs);
+  }
+
+  isUserBlocked(userId: string): boolean {
+    const blockedUntil = this.userBlockState.get(userId);
+    if (!blockedUntil) return false;
+    if (blockedUntil > Date.now()) return true;
+    this.userBlockState.delete(userId);
+    return false;
+  }
+
+  async triggerFailSecure(userId: string) {
+    await this.revokeAll(userId);
+    await this.logActivity(userId, { action: 'fail_secure_triggered', at: new Date() });
+    this.blockUserTemporarily(userId);
   }
 
   recordFailedLoginAttempt(ipAddress: string) {

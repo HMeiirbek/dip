@@ -14,10 +14,15 @@ import { AdminModule } from './admin/admin.module';
 import { MlModule } from './ml/ml.module';
 import { ChatsModule } from './chats/chats.module';
 import { SupportModule } from './support/support.module';
+import { SfuModule } from './sfu/sfu.module';
+import { CleanupModule } from './cleanup/cleanup.module';
+import { PushModule } from './push/push.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ envFilePath: ['.env.local', '.env'] }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -32,6 +37,9 @@ import { SupportModule } from './support/support.module';
     MlModule,
     ChatsModule,
     SupportModule,
+    SfuModule,
+    CleanupModule,
+    PushModule,
   ],
 })
 export class AppModule {}

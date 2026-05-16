@@ -95,11 +95,11 @@ export class AdminService {
   }
 
   async dashboard() {
-    const [users, totalCalls, ongoingCalls, endedCalls] = await Promise.all([
+    const [users, totalRooms, ongoingRooms, endedRooms] = await Promise.all([
       this.prisma.user.count(),
-      this.prisma.call.count(),
-      this.prisma.call.count({ where: { status: { in: ['pending', 'accepted', 'active'] } } }),
-      this.prisma.call.count({ where: { status: 'ended' } }),
+      this.prisma.room.count(),
+      this.prisma.room.count({ where: { status: 'active' } }),
+      this.prisma.room.count({ where: { status: 'ended' } }),
     ]);
 
     const [reports, blacklist, systemLogs] = await Promise.all([
@@ -110,12 +110,12 @@ export class AdminService {
 
     return {
       users,
-      totalCalls,
-      ongoingCalls,
-      endedCalls,
+      totalCalls: totalRooms,
+      ongoingCalls: ongoingRooms,
+      endedCalls: endedRooms,
       reports: reports.length,
       blacklistEntries: blacklist.length,
-      activeThreats: ongoingCalls + reports.slice(0, 24).length,
+      activeThreats: ongoingRooms + reports.slice(0, 24).length,
       recentSystemEvents: systemLogs.slice(0, 10),
     };
   }
@@ -160,13 +160,10 @@ export class AdminService {
         userIds,
       ),
       this.prisma.$queryRawUnsafe<Array<{ user_id: string; call_count: string }>>(
-        `SELECT participant.user_id, COUNT(*)::text AS call_count
-         FROM (
-           SELECT "callerId" AS user_id FROM "Call" WHERE "callerId" = ANY($1::text[])
-           UNION ALL
-           SELECT "calleeId" AS user_id FROM "Call" WHERE "calleeId" = ANY($1::text[])
-         ) participant
-         GROUP BY participant.user_id`,
+        `SELECT user_id, COUNT(*)::text AS call_count
+         FROM "RoomParticipant"
+         WHERE user_id = ANY($1::text[])
+         GROUP BY user_id`,
         userIds,
       ),
       this.prisma.$queryRawUnsafe<Array<{ user_id: string; report_count: string }>>(
@@ -285,18 +282,21 @@ export class AdminService {
          LIMIT 300`,
         id,
       ),
-      this.prisma.call.findMany({
+      this.prisma.room.findMany({
         where: {
-          OR: [
-            { callerId: id },
-            { calleeId: id },
-          ],
+          participants: {
+            some: { userId: id },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 120,
         include: {
-          caller: { select: { id: true, username: true } },
-          callee: { select: { id: true, username: true } },
+          host: { select: { id: true, username: true } },
+          participants: {
+            include: {
+              user: { select: { id: true, username: true } },
+            },
+          },
         },
       }),
       this.prisma.$queryRawUnsafe<
@@ -316,16 +316,18 @@ export class AdminService {
         id,
       ),
       Promise.all([
-        this.prisma.call.count({
+        this.prisma.room.count({
           where: {
-            OR: [
-              { callerId: id },
-              { calleeId: id },
-            ],
+            participants: { some: { userId: id } },
           },
         }),
-        this.prisma.call.count({ where: { callerId: id } }),
-        this.prisma.call.count({ where: { calleeId: id } }),
+        this.prisma.room.count({ where: { hostId: id } }),
+        this.prisma.room.count({
+          where: {
+            participants: { some: { userId: id } },
+            hostId: { not: id },
+          },
+        }),
         this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
           `SELECT COUNT(*)::text AS count
            FROM risk_reports
@@ -336,9 +338,10 @@ export class AdminService {
       this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
         `SELECT COUNT(*)::text AS count
          FROM moderation_call_flags f
-         JOIN "Call" c ON c.id = f.call_id
+         JOIN "Room" r ON r.id = f.room_id
+         JOIN "RoomParticipant" p ON p.room_id = r.id
          WHERE f.status = 'open'
-           AND (c."callerId" = $1 OR c."calleeId" = $1)`,
+           AND p.user_id = $1`,
         id,
       ),
     ]);
@@ -387,15 +390,11 @@ export class AdminService {
         deviceInfo: row.device || undefined,
       })),
       callHistory: calls.map((call) => {
-        const counterpart =
-          call.callerId === id
-            ? { id: call.calleeId, username: call.callee?.username || call.calleeId }
-            : { id: call.callerId, username: call.caller?.username || call.callerId };
-        const baseline = call.startedAt || call.createdAt;
+        const started = call.startedAt || call.createdAt;
         const end = call.endedAt || new Date();
         const durationSec =
-          baseline && end
-            ? Math.max(0, Math.floor((new Date(end).getTime() - new Date(baseline).getTime()) / 1000))
+          started && end
+            ? Math.max(0, Math.floor((new Date(end).getTime() - new Date(started).getTime()) / 1000))
             : 0;
 
         return {
@@ -405,8 +404,8 @@ export class AdminService {
           startedAt: call.startedAt,
           endedAt: call.endedAt,
           durationSec,
-          direction: call.callerId === id ? 'outgoing' : 'incoming',
-          counterpart,
+          host: call.host,
+          participants: call.participants.map(p => p.user),
         };
       }),
       reports: reportRows.map((row) => ({
@@ -511,12 +510,12 @@ export class AdminService {
   }
 
   async calls() {
-    return this.prisma.call.findMany({
+    return this.prisma.room.findMany({
       orderBy: { createdAt: 'desc' },
       take: 300,
       include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
+        host: { select: { id: true, username: true } },
+        participants: { include: { user: { select: { id: true, username: true } } } },
       },
     });
   }
@@ -625,12 +624,12 @@ export class AdminService {
         created_at: Date;
         call_status: string | null;
         caller_username: string | null;
-        callee_username: string | null;
+        host_username: string | null;
       }>
     >(
       `SELECT
         q.id,
-        q.call_id,
+        q.room_id as call_id,
         q.user_id,
         u.username,
         q.rtt_ms,
@@ -639,14 +638,12 @@ export class AdminService {
         q.mos_like,
         q.bitrate_kbps,
         q.created_at,
-        c.status AS call_status,
-        caller.username AS caller_username,
-        callee.username AS callee_username
+        r.status AS call_status,
+        host.username AS host_username
        FROM call_quality_metrics q
        LEFT JOIN "User" u ON u.id = q.user_id
-       LEFT JOIN "Call" c ON c.id = q.call_id
-       LEFT JOIN "User" caller ON caller.id = c."callerId"
-       LEFT JOIN "User" callee ON callee.id = c."calleeId"
+       LEFT JOIN "Room" r ON r.id = q.room_id
+       LEFT JOIN "User" host ON host.id = r."hostId"
        ORDER BY q.created_at DESC
        LIMIT $1`,
       safeLimit,
@@ -664,8 +661,7 @@ export class AdminService {
       mosLike: row.mos_like,
       bitrateKbps: row.bitrate_kbps,
       callStatus: row.call_status || 'unknown',
-      callerUsername: row.caller_username || 'unknown',
-      calleeUsername: row.callee_username || 'unknown',
+      hostUsername: row.host_username || 'unknown',
     }));
   }
 
@@ -694,13 +690,13 @@ export class AdminService {
             onlineIds,
           )
         : Promise.resolve([]),
-      this.prisma.call.findMany({
-        where: { status: { in: ['pending', 'accepted', 'active'] } },
+      this.prisma.room.findMany({
+        where: { status: 'active' },
         orderBy: { createdAt: 'desc' },
         take: 200,
         include: {
-          caller: { select: { id: true, username: true } },
-          callee: { select: { id: true, username: true } },
+          host: { select: { id: true, username: true } },
+          participants: { include: { user: { select: { id: true, username: true } } } },
         },
       }),
     ]);
@@ -718,11 +714,11 @@ export class AdminService {
             created_at: Date;
           }>
         >(
-          `SELECT DISTINCT ON (call_id)
-            call_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at
+          `SELECT DISTINCT ON (room_id)
+            room_id as call_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at
            FROM call_quality_metrics
-           WHERE call_id = ANY($1::text[])
-           ORDER BY call_id, created_at DESC`,
+           WHERE room_id = ANY($1::text[])
+           ORDER BY room_id, created_at DESC`,
           callIds,
         )
       : [];
@@ -737,16 +733,16 @@ export class AdminService {
             mos_like: number | null;
           }>
         >(
-          `SELECT call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like
+          `SELECT room_id as call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like
            FROM (
              SELECT
-               call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like,
-               ROW_NUMBER() OVER (PARTITION BY call_id ORDER BY created_at DESC) AS rn
+               room_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like,
+               ROW_NUMBER() OVER (PARTITION BY room_id ORDER BY created_at DESC) AS rn
              FROM call_quality_metrics
-             WHERE call_id = ANY($1::text[])
+             WHERE room_id = ANY($1::text[])
            ) ranked
            WHERE rn <= 24
-           ORDER BY call_id ASC, created_at ASC`,
+           ORDER BY room_id ASC, created_at ASC`,
           callIds,
         )
       : [];

@@ -15,7 +15,7 @@ interface CallsPanelProps {
   onAccept: () => Promise<void> | void;
   onReject: () => Promise<void> | void;
   onEnd: () => Promise<void> | void;
-  remoteStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
   onNavigate: (tab: any) => void;
 }
 
@@ -29,7 +29,7 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
   onAccept,
   onReject,
   onEnd,
-  remoteStream,
+  remoteStreams,
   onNavigate,
 }) => {
   const isMobile = useMediaQuery('(max-width: 840px)');
@@ -62,12 +62,15 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
             />
           </div>
 
-          {callStatus === 'active' && remoteStream && (
+          {callStatus === 'active' && remoteStreams.size > 0 && (
             <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}>
-              <AudioStream
-                stream={remoteStream}
-                isMuted={false}
-              />
+              {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
+                <AudioStream
+                  key={peerId}
+                  stream={stream}
+                  isMuted={false}
+                />
+              ))}
             </div>
           )}
         </div>

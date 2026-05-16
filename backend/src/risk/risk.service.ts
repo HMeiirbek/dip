@@ -12,43 +12,53 @@ export class RiskService {
   ) {}
 
   async analysis(userId: string) {
-    const calls = await this.prisma.call.findMany({
+    const rooms = await this.prisma.room.findMany({
       where: {
-        OR: [{ callerId: userId }, { calleeId: userId }],
+        participants: {
+          some: { userId },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: {
-        caller: { select: { id: true, username: true } },
-        callee: { select: { id: true, username: true } },
+        host: { select: { id: true, username: true } },
+        participants: {
+          include: {
+            user: { select: { id: true, username: true } },
+          },
+        },
       },
     });
 
     const reports = await this.callsService.listReports();
     const reportedByUser = reports.filter((r) => r.userId === userId).length;
-    const riskyCalls = calls.filter((c) => ['pending', 'rejected'].includes(c.status)).length;
+    const riskyCalls = rooms.filter((c) => c.status === 'ended').length; // Heuristic
     const riskScore = Math.min(100, riskyCalls * 8 + reportedByUser * 5);
 
     return {
       userId,
-      totalCalls: calls.length,
+      totalCalls: rooms.length,
       riskyCalls,
       reportedByUser,
       riskScore,
       confidence: Math.min(0.99, 0.5 + riskScore / 200),
-      recent: calls.slice(0, 30),
+      recent: rooms.slice(0, 30),
     };
   }
 
   async monitor() {
-    const [liveCalls, reports, blacklist] = await Promise.all([
-      this.prisma.call.findMany({
-        where: { status: { in: ['pending', 'accepted', 'active'] } },
+    const [liveRooms, reports, blacklist] = await Promise.all([
+      this.prisma.room.findMany({
+        where: { status: 'active' },
         orderBy: { createdAt: 'desc' },
         take: 100,
         include: {
-          caller: { select: { id: true, username: true } },
-          callee: { select: { id: true, username: true } },
+          host: { select: { id: true, username: true } },
+          participants: {
+            include: {
+              user: { select: { id: true, username: true } },
+            },
+          },
         },
       }),
       this.callsService.listReports(),
@@ -57,30 +67,27 @@ export class RiskService {
 
     return {
       streamAt: new Date(),
-      liveCalls,
+      liveCalls: liveRooms,
       highPriorityReports: reports.slice(0, 20),
       blacklistPreview: blacklist.slice(0, 20),
     };
   }
 
   async stats() {
-    const [total, pending, accepted, active, rejected, ended] = await Promise.all([
-      this.prisma.call.count(),
-      this.prisma.call.count({ where: { status: 'pending' } }),
-      this.prisma.call.count({ where: { status: 'accepted' } }),
-      this.prisma.call.count({ where: { status: 'active' } }),
-      this.prisma.call.count({ where: { status: 'rejected' } }),
-      this.prisma.call.count({ where: { status: 'ended' } }),
+    const [total, active, ended] = await Promise.all([
+      this.prisma.room.count(),
+      this.prisma.room.count({ where: { status: 'active' } }),
+      this.prisma.room.count({ where: { status: 'ended' } }),
     ]);
 
     const reports = await this.callsService.listReports();
     const blacklist = await this.blacklistService.list();
 
     return {
-      calls: { total, pending, accepted, active, rejected, ended },
+      calls: { total, active, ended, pending: 0, accepted: 0, rejected: 0 },
       reports: reports.length,
       blacklist: blacklist.length,
-      suspiciousLoad: pending + active + reports.length,
+      suspiciousLoad: active + reports.length,
     };
   }
 }

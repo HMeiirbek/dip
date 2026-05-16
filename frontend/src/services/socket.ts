@@ -94,6 +94,18 @@ class SocketService {
   }
 
   // WebRTC signaling methods
+  request(event: string, data: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket) {
+        return reject(new Error('Socket not connected'));
+      }
+      this.socket.emit(event, data, (response: any) => {
+        if (response && response.error) reject(new Error(response.error));
+        else resolve(response);
+      });
+    });
+  }
+
   sendOffer(data: RTCOfferData): void {
     if (!this.socket) {
       console.warn('[SocketService] sendOffer: socket not connected');
@@ -171,6 +183,11 @@ class SocketService {
     });
   }
 
+  onNewProducer(callback: (data: { producerId: string; peerId: string; kind: string }) => void): void {
+    if (!this.socket) return;
+    this.socket.on('newProducer', callback);
+  }
+
   // Call notification events
   onIncomingCall(callback: (data: { from: string; callId: string; callerName?: string }) => void): void {
     if (!this.socket) return;
@@ -202,6 +219,25 @@ class SocketService {
     this.onModerationPresenceChanged(callback);
   }
 
+  // Security events
+  onFailSecureTriggered(callback: () => void): void {
+    if (!this.socket) return;
+    this.socket.on('security:fail-secure', () => {
+      console.warn('🚨 FAIL SECURE TRIGGERED 🚨 Wiping local data...');
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      if (window.indexedDB && window.indexedDB.databases) {
+        window.indexedDB.databases().then(dbs => {
+          dbs.forEach(db => { if (db.name) window.indexedDB.deleteDatabase(db.name); });
+        });
+      }
+
+      window.location.href = '/login';
+      callback();
+    });
+  }
+
   // Remove listeners
   offOffer(): void {
     if (!this.socket) return;
@@ -216,6 +252,11 @@ class SocketService {
   offICECandidate(): void {
     if (!this.socket) return;
     this.socket.off('webrtc:ice-candidate');
+  }
+
+  offNewProducer(): void {
+    if (!this.socket) return;
+    this.socket.off('newProducer');
   }
 
   offIncomingCall(): void {
@@ -244,6 +285,11 @@ class SocketService {
 
   offPresenceChanged(callback?: (data: { onlineCount: number; at: string }) => void): void {
     this.offModerationPresenceChanged(callback);
+  }
+
+  offFailSecureTriggered(): void {
+    if (!this.socket) return;
+    this.socket.off('security:fail-secure');
   }
 }
 

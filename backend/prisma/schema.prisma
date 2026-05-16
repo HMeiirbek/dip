@@ -35,11 +35,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  callsInitiated Call[] @relation("CallerRelation")
-  callsReceived  Call[] @relation("CalleeRelation")
+  hostedRooms    Room[] @relation("RoomHostRelation")
+  roomParticipations RoomParticipant[]
   sessions       Session[]
   reports        Report[]
   notifications  Notification[]
+  pushSubscriptions NotificationSubscription[]
   securityLogs   SecurityLog[]
   sentMessages   Message[]      @relation("MessageSenderRelation")
   receivedMessages Message[]    @relation("MessageReceiverRelation")
@@ -54,28 +55,35 @@ model User {
   inContacts      Contact[] @relation("UserInContacts")
 }
 
-model Call {
+model Room {
   id             String   @id @default(uuid())
-  callerId       String
-  calleeId       String
-  callerNumber   String?
-  receiverNumber String?
-  callTime       DateTime @default(now())
-  duration       Int?
-  riskScore      Int      @default(0)
-  caller         User     @relation("CallerRelation", fields: [callerId], references: [id])
-  callee         User     @relation("CalleeRelation", fields: [calleeId], references: [id])
-  status         String   @default("pending") // pending | accepted | rejected | active | ended
+  hostId         String
+  host           User     @relation("RoomHostRelation", fields: [hostId], references: [id])
+  status         String   @default("active") // active | ended
   startedAt      DateTime?
   endedAt        DateTime?
-  expiresAt      DateTime? // deadline for pending -> auto-reject
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  
+  participants   RoomParticipant[]
+  
   analysis       CallAnalysis[]
   qualityMetrics CallQualityMetrics[]
   moderationFlags ModerationCallFlag[]
+}
 
-  @@index([expiresAt], name: "expiresAt_idx")
+model RoomParticipant {
+  id        String   @id @default(uuid())
+  roomId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([userId])
 }
 
 model Session {
@@ -91,8 +99,8 @@ model Session {
 
 model CallAnalysis {
   id          String   @id @default(uuid())
-  callId      String
-  call        Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   mlVersion   String
   confidence  Float
   riskFactors Json
@@ -130,6 +138,19 @@ model Notification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model NotificationSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
 }
 
 model Message {
@@ -251,7 +272,7 @@ model MlModel {
 }
 model CallQualityMetrics {
   id              String   @id @default(uuid())
-  callId          String   @map("call_id")
+  roomId          String   @map("room_id")
   userId          String   @map("user_id")
   rttMs           Float?   @map("rtt_ms")
   jitterMs        Float?   @map("jitter_ms")
@@ -260,10 +281,10 @@ model CallQualityMetrics {
   bitrateKbps     Float?   @map("bitrate_kbps")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  call            Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  room            Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@map("call_quality_metrics")
-  @@index([callId, createdAt])
+  @@index([roomId, createdAt])
 }
 
 model SecurityUserState {
@@ -308,16 +329,16 @@ model SecurityLog {
 
 model ModerationCallFlag {
   id        String   @id @default(uuid())
-  callId    String   @map("call_id")
+  roomId    String   @map("room_id")
   actorId   String   @map("actor_id")
   actorRole String   @map("actor_role")
   reason    String
   status    String   @default("open")
   createdAt DateTime @default(now()) @map("created_at")
 
-  call Call @relation(fields: [callId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([callId])
+  @@index([roomId])
   @@index([status])
   @@map("moderation_call_flags")
 }
