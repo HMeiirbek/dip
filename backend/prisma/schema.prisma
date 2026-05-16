@@ -99,7 +99,7 @@ model Session {
 
 model CallAnalysis {
   id          String   @id @default(uuid())
-  roomId      String
+  roomId      String   @map("callId")
   room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   mlVersion   String
   confidence  Float
@@ -272,7 +272,7 @@ model MlModel {
 }
 model CallQualityMetrics {
   id              String   @id @default(uuid())
-  roomId          String   @map("room_id")
+  roomId          String   @map("call_id")
   userId          String   @map("user_id")
   rttMs           Float?   @map("rtt_ms")
   jitterMs        Float?   @map("jitter_ms")
@@ -329,7 +329,7 @@ model SecurityLog {
 
 model ModerationCallFlag {
   id        String   @id @default(uuid())
-  roomId    String   @map("room_id")
+  roomId    String   @map("call_id")
   actorId   String   @map("actor_id")
   actorRole String   @map("actor_role")
   reason    String

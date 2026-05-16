@@ -338,8 +338,8 @@ export class AdminService {
       this.prisma.$queryRawUnsafe<Array<{ count: string }>>(
         `SELECT COUNT(*)::text AS count
          FROM moderation_call_flags f
-         JOIN "Room" r ON r.id = f.room_id
-         JOIN "RoomParticipant" p ON p.room_id = r.id
+         JOIN "Room" r ON r.id = f.call_id
+         JOIN "RoomParticipant" p ON p."roomId" = r.id
          WHERE f.status = 'open'
            AND p.user_id = $1`,
         id,
@@ -629,7 +629,7 @@ export class AdminService {
     >(
       `SELECT
         q.id,
-        q.room_id as call_id,
+        q.call_id,
         q.user_id,
         u.username,
         q.rtt_ms,
@@ -642,7 +642,7 @@ export class AdminService {
         host.username AS host_username
        FROM call_quality_metrics q
        LEFT JOIN "User" u ON u.id = q.user_id
-       LEFT JOIN "Room" r ON r.id = q.room_id
+       LEFT JOIN "Room" r ON r.id = q.call_id
        LEFT JOIN "User" host ON host.id = r."hostId"
        ORDER BY q.created_at DESC
        LIMIT $1`,
@@ -714,11 +714,11 @@ export class AdminService {
             created_at: Date;
           }>
         >(
-          `SELECT DISTINCT ON (room_id)
-            room_id as call_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at
+          `SELECT DISTINCT ON (call_id)
+            call_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps, created_at
            FROM call_quality_metrics
-           WHERE room_id = ANY($1::text[])
-           ORDER BY room_id, created_at DESC`,
+           WHERE call_id = ANY($1::text[])
+           ORDER BY call_id, created_at DESC`,
           callIds,
         )
       : [];
@@ -733,16 +733,16 @@ export class AdminService {
             mos_like: number | null;
           }>
         >(
-          `SELECT room_id as call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like
+          `SELECT call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like
            FROM (
              SELECT
-               room_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like,
-               ROW_NUMBER() OVER (PARTITION BY room_id ORDER BY created_at DESC) AS rn
+               call_id, created_at, rtt_ms, jitter_ms, packet_loss_pct, mos_like,
+               ROW_NUMBER() OVER (PARTITION BY call_id ORDER BY created_at DESC) AS rn
              FROM call_quality_metrics
-             WHERE room_id = ANY($1::text[])
+             WHERE call_id = ANY($1::text[])
            ) ranked
            WHERE rn <= 24
-           ORDER BY room_id ASC, created_at ASC`,
+           ORDER BY call_id ASC, created_at ASC`,
           callIds,
         )
       : [];
@@ -1016,7 +1016,7 @@ export class AdminService {
     >(
       `SELECT created_at, user_id, rtt_ms, jitter_ms, packet_loss_pct, mos_like, bitrate_kbps
        FROM call_quality_metrics
-       WHERE room_id = $1
+       WHERE call_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
       callId,
@@ -1038,7 +1038,7 @@ export class AdminService {
       >(
         `SELECT id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
          FROM moderation_call_flags
-         WHERE room_id = $1
+         WHERE call_id = $1
          ORDER BY created_at DESC
          LIMIT 200`,
         callId,
@@ -1252,7 +1252,7 @@ export class AdminService {
     const flagId = crypto.randomUUID();
     await this.prisma.$executeRawUnsafe(
       `INSERT INTO moderation_call_flags
-        (id, room_id, actor_id, actor_role, reason, status, created_at)
+        (id, call_id, actor_id, actor_role, reason, status, created_at)
        VALUES
         ($1, $2, $3, $4, $5, 'open', NOW())`,
       flagId,
@@ -1317,7 +1317,7 @@ export class AdminService {
       const p2 = pushParam(like);
       const p3 = pushParam(like);
       const p4 = pushParam(like);
-      whereClauses.push(`(room_id ILIKE ${p1} OR reason ILIKE ${p2} OR actor_role ILIKE ${p3} OR actor_id ILIKE ${p4})`);
+      whereClauses.push(`(call_id ILIKE ${p1} OR reason ILIKE ${p2} OR actor_role ILIKE ${p3} OR actor_id ILIKE ${p4})`);
     }
 
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -1337,7 +1337,7 @@ export class AdminService {
         resolved_by: string | null;
       }>
     >(
-      `SELECT id, room_id as call_id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
+      `SELECT id, call_id, actor_id, actor_role, reason, status, created_at, resolved_at, resolved_by
        FROM moderation_call_flags
        ${whereSql}
        ORDER BY ${orderColumn} ${sortDir}, created_at DESC
