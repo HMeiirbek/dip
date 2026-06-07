@@ -373,11 +373,14 @@ export const App: React.FC = () => {
       }
 
       pc.ontrack = (event) => {
-        console.log('[WebRTC][Diagnostic] ontrack event received! TRACK:', event.track);
-        console.log('[WebRTC] setting remote stream for playback');
-        const newStream = new MediaStream([event.track]);
+        console.log('[WebRTC][Diagnostic] ontrack fired! streams:', event.streams.length, 'track:', event.track.kind, event.track.readyState);
         const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
-        setRemoteStreams(new Map([[remoteUserId, newStream]]));
+        // Prefer the stream already associated with the track (has correct id/label)
+        const incomingStream = event.streams[0] ?? new MediaStream([event.track]);
+        console.log('[WebRTC] Setting remote stream, tracks:', incomingStream.getAudioTracks().length);
+        setRemoteStreams(new Map([[remoteUserId, incomingStream]]));
+        // If track arrives before callStatus is set to active, push it anyway
+        setCallStatus((prev) => (prev === 'calling' || prev === 'incoming' ? 'active' : prev));
       };
 
       pc.oniceconnectionstatechange = () => {

@@ -62,8 +62,8 @@ export const CallsPanel: React.FC<CallsPanelProps> = ({
             />
           </div>
 
-          {callStatus === 'active' && remoteStreams.size > 0 && (
-            <div style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}>
+          {remoteStreams.size > 0 && (
+            <div>
               {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
                 <AudioStream
                   key={peerId}
