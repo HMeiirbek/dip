@@ -18,6 +18,7 @@ import { CallsService } from '../calls/calls.service';
 import { JwtService } from '@nestjs/jwt';
 import { CallEventsService } from '../calls/call-events.service';
 import { WsPresenceService } from './ws-presence.service';
+import { SfuService } from '../sfu/sfu.service';
 
 interface WebRTCOffer {
   callId: string;
@@ -103,6 +104,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService: JwtService,
     private callEvents: CallEventsService,
     private presence: WsPresenceService,
+    private sfuService: SfuService,
   ) {
     // subscribe to server-side incoming call events
     this.callEvents.onIncoming((e) => {
@@ -428,5 +430,66 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.server.to(socketId).emit('chat:message', payload);
       }
     }
+  }
+
+  // ─── SFU (mediasoup) message handlers ───────────────────────────────────────
+
+  private peerToRoom = new Map<string, string>();
+
+  @SubscribeMessage('joinRoom')
+  async handleJoinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    client.join(data.roomId);
+    this.peerToRoom.set(client.id, data.roomId);
+    this.logger.log(`[SFU] Peer ${client.id} joined room ${data.roomId}`);
+    return { success: true };
+  }
+
+  @SubscribeMessage('getRouterRtpCapabilities')
+  async handleGetRouterRtpCapabilities(@MessageBody() _data: any) {
+    return this.sfuService.getRouterRtpCapabilities();
+  }
+
+  @SubscribeMessage('createWebRtcTransport')
+  async handleCreateWebRtcTransport(@ConnectedSocket() client: Socket) {
+    return this.sfuService.createWebRtcTransport(client.id);
+  }
+
+  @SubscribeMessage('connectWebRtcTransport')
+  async handleConnectWebRtcTransport(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { transportId: string; dtlsParameters: any },
+  ) {
+    return this.sfuService.connectWebRtcTransport(client.id, data.transportId, data.dtlsParameters);
+  }
+
+  @SubscribeMessage('produce')
+  async handleProduce(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { transportId: string; kind: 'audio' | 'video'; rtpParameters: any; appData?: any },
+  ) {
+    const result = await this.sfuService.produce(client.id, data.transportId, data.kind, data.rtpParameters);
+
+    // Broadcast to others in the same room
+    const roomId = this.peerToRoom.get(client.id);
+    if (roomId) {
+      this.server.to(roomId).except(client.id).emit('newProducer', {
+        producerId: result.id,
+        peerId: client.id,
+        kind: data.kind,
+      });
+    }
+
+    return result;
+  }
+
+  @SubscribeMessage('consume')
+  async handleConsume(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { transportId: string; producerId: string; rtpCapabilities: any },
+  ) {
+    return this.sfuService.consume(client.id, data.transportId, data.producerId, data.rtpCapabilities);
   }
 }
