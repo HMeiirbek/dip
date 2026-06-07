@@ -5,13 +5,12 @@ import s from './CallHistoryList.module.css';
 
 interface CallHistoryItem {
   id: string;
-  callerId: string;
-  calleeId: string;
+  hostId: string;
   status: 'pending' | 'accepted' | 'rejected' | 'ended' | 'missed';
   createdAt: string;
   endedAt?: string;
-  caller: { id: string; username: string };
-  callee: { id: string; username: string };
+  host?: { id: string; username: string };
+  participants?: Array<{ user: { id: string; username: string } }>;
 }
 
 interface CallHistoryListProps {
@@ -46,10 +45,10 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({
 
   const filteredHistory = useMemo(() => {
     if (filter === 'missed') {
-      return history.filter(item => 
-        item.status === 'missed' || 
-        (item.status === 'rejected' && item.calleeId === currentUserId)
-      );
+      return history.filter(item => {
+        const isHost = item.hostId === currentUserId;
+        return item.status === 'missed' || (item.status === 'rejected' && !isHost);
+      });
     }
     return history;
   }, [history, filter, currentUserId]);
@@ -68,12 +67,11 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({
     return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
-  const getCallTypeInfo = (call: CallHistoryItem) => {
-    const isOutgoing = call.callerId === currentUserId;
-    const isMissed = call.status === 'missed' || (call.status === 'rejected' && !isOutgoing);
+  const getCallTypeInfo = (call: CallHistoryItem, isHost: boolean) => {
+    const isMissed = call.status === 'missed' || (call.status === 'rejected' && !isHost);
     
     if (isMissed) return { label: 'Пропущенный', color: 'var(--danger)', icon: <PhoneMissed size={14} color="var(--danger)" /> };
-    if (isOutgoing) return { label: 'Исходящий', color: 'var(--muted)', icon: <PhoneOutgoing size={14} /> };
+    if (isHost) return { label: 'Исходящий', color: 'var(--muted)', icon: <PhoneOutgoing size={14} /> };
     return { label: 'Входящий', color: 'var(--muted)', icon: <PhoneIncoming size={14} /> };
   };
 
@@ -112,8 +110,13 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({
 
       <div className={s.list}>
         {filteredHistory.map(call => {
-          const typeInfo = getCallTypeInfo(call);
-          const remoteUser = call.callerId === currentUserId ? call.callee : call.caller;
+          const isHost = call.hostId === currentUserId;
+          const otherParticipant = call.participants?.find(p => p.user.id !== currentUserId)?.user;
+          const remoteUser = isHost ? otherParticipant : call.host;
+
+          if (!remoteUser) return null;
+
+          const typeInfo = getCallTypeInfo(call, isHost);
           const initials = (remoteUser.username?.[0] || '?').toUpperCase();
           const isMissed = typeInfo.label === 'Пропущенный';
 

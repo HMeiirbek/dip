@@ -12,14 +12,28 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
+  const [localError, setLocalError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLocalError('');
 
     try {
       let authResponse;
       if (isRegister) {
+        // Password validation matching backend rules
+        const hasUpperCase = /[A-ZА-Я]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+        if (password.length < 8 || !hasUpperCase || !hasNumber || !hasSpecialChar) {
+          const errMsg = 'Пароль должен быть от 8 символов, содержать заглавную букву, цифру и спецсимвол.';
+          setLocalError(errMsg);
+          onError?.(errMsg);
+          setIsLoading(false);
+          return;
+        }
+
         try {
           await apiService.register(username, password);
           authResponse = await apiService.login(username, password);
@@ -44,10 +58,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
           : status === 429
           ? 'Too many login attempts. Please try again later.'
           : status === 502 || status === 503 || status === 504
-          ? 'Server is temporarily unavailable. Please try again in a moment.'
+          ? 'Сервер временно недоступен. Попробуйте позже.'
           : error.response?.data?.message ||
             error.message ||
-            'Authentication failed';
+            'Ошибка авторизации: неверный логин или пароль';
+      setLocalError(errorMessage);
       onError?.(errorMessage);
     } finally {
       setIsLoading(false);
@@ -59,6 +74,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
       <div className={s.card}>
         <h1 className={s.title}>DIP</h1>
         <p className={s.subtitle}>Secure Voice Communication</p>
+
+        {localError && <div className={s.errorMsg}>{localError}</div>}
 
         <form onSubmit={handleSubmit} className={s.form}>
           <div className={s.formGroup}>
@@ -93,26 +110,29 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
             className={s.primaryButton}
           >
             {isLoading
-              ? 'Loading...'
+              ? 'Загрузка...'
               : isRegister
-              ? 'Create Account'
-              : 'Sign In'}
+              ? 'Создать аккаунт'
+              : 'Войти'}
           </button>
         </form>
 
         <div className={s.toggleAuth}>
           <span className={s.toggleText}>
             {isRegister
-              ? 'Already have an account? '
-              : "Don't have an account? "}
+              ? 'Уже есть аккаунт? '
+              : "Нет аккаунта? "}
           </span>
           <button
             type="button"
-            onClick={() => setIsRegister(!isRegister)}
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setLocalError('');
+            }}
             className={s.toggleButton}
             disabled={isLoading}
           >
-            {isRegister ? 'Sign In' : 'Create Account'}
+            {isRegister ? 'Войти' : 'Создать аккаунт'}
           </button>
         </div>
       </div>
