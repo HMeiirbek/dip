@@ -25,7 +25,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
         // Password validation matching backend rules
         const hasUpperCase = /[A-ZА-Я]/.test(password);
         const hasNumber = /[0-9]/.test(password);
-        const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+        const hasSpecialChar = /[^a-zA-Z0-9]/.test(password);
         if (password.length < 8 || !hasUpperCase || !hasNumber || !hasSpecialChar) {
           const errMsg = 'Пароль должен быть от 8 символов, содержать заглавную букву, цифру и спецсимвол.';
           setLocalError(errMsg);
