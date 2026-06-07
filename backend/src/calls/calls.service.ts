@@ -108,21 +108,35 @@ export class CallsService {
   async end(id: string, userId: string) {
     const room = await this.prisma.room.findUnique({
       where: { id },
+      include: {
+        participants: { select: { userId: true } },
+      },
     });
 
     if (!room) throw new NotFoundException('Room not found');
-    if (room.hostId !== userId) {
-      throw new ForbiddenException('Only the host can end the room');
+
+    // Allow any participant OR the host to end the call
+    const isParticipant = room.participants.some(p => p.userId === userId);
+    if (!isParticipant && room.hostId !== userId) {
+      throw new ForbiddenException('Not a participant of this room');
     }
 
-    return this.prisma.room.update({
+    // If already ended, just return without error
+    if (room.status === 'ended') {
+      return { ...room, participantIds: room.participants.map(p => p.userId) };
+    }
+
+    const updated = await this.prisma.room.update({
       where: { id },
       data: {
         status: 'ended',
         endedAt: new Date(),
       },
     });
+
+    return { ...updated, participantIds: room.participants.map(p => p.userId) };
   }
+
 
   async checkNumber(phoneNumber: string) {
     const normalized = phoneNumber?.trim();

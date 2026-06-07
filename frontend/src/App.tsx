@@ -510,15 +510,8 @@ export const App: React.FC = () => {
     console.log('[Calls] Call created:', call.id);
     activeCallRef.current = call;
     setActiveCall(call);
-
-    const joined = await setupWebRTC(call);
-    if (!joined) {
-      console.error('[Calls] Failed to setup SFU');
-      await apiService.endCall(call.id);
-      activeCallRef.current = null;
-      setActiveCall(null);
-      return;
-    }
+    // Do NOT join SFU room yet — wait for callee to accept first
+    // SFU join happens in onCallAccepted handler
   };
 
   const releaseConflictingCall = async (calleeId: string, currentUserId: string): Promise<boolean> => {
@@ -571,10 +564,21 @@ export const App: React.FC = () => {
   };
 
   const endCall = async () => {
-    if (!activeCall) return;
+    const callToEnd = activeCall || (callStatus === 'calling' ? activeCallRef.current : null);
+    if (!callToEnd) {
+      // Nothing active — just reset UI
+      resetRtcState();
+      incomingCallRef.current = null;
+      activeCallRef.current = null;
+      setActiveCall(null);
+      setIncomingCall(null);
+      setRemoteUsername(null);
+      setCallStatus('idle');
+      return;
+    }
     stopQualityReporter();
     try {
-      await apiService.endCall(activeCall.id);
+      await apiService.endCall(callToEnd.id);
     } catch {}
 
     resetRtcState();
@@ -585,7 +589,7 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (callStatus === 'active' && activeCall?.id && peerConnectionRef.current) {
+    if (callStatus === 'active' && activeCall?.id) {
       startQualityReporter(activeCall.id);
       return;
     }
@@ -599,6 +603,7 @@ export const App: React.FC = () => {
     socketService.offICECandidate();
     socketService.offIncomingCall();
     socketService.offCallAccepted();
+    socketService.offCallRejected();
     socketService.offCallEnded();
     if (moderationPresenceListenerRef.current) {
       socketService.offPresenceChanged(moderationPresenceListenerRef.current);
@@ -624,10 +629,32 @@ export const App: React.FC = () => {
       // Unused in SFU
     });
 
-    socketService.onCallAccepted((data: { callId: string }) => {
-      if (activeCallRef.current?.id === data.callId) {
-        setCallStatus('active');
+    socketService.onCallAccepted(async (data: { callId: string }) => {
+      const call = activeCallRef.current;
+      if (!call || call.id !== data.callId) return;
+      console.log('[Calls] Call accepted by callee, joining SFU room:', data.callId);
+      const joined = await setupWebRTC(call);
+      if (!joined) {
+        console.error('[Calls] Failed to setup SFU after acceptance');
+        try { await apiService.endCall(call.id); } catch {}
+        activeCallRef.current = null;
+        setActiveCall(null);
+        setCallStatus('error');
+        setErrorMessage('Failed to establish audio connection.');
+        return;
       }
+      setCallStatus('active');
+    });
+
+    socketService.onCallRejected((data: { callId: string }) => {
+      if (activeCallRef.current?.id !== data.callId) return;
+      resetRtcState();
+      activeCallRef.current = null;
+      setActiveCall(null);
+      setRemoteUsername(null);
+      setCallStatus('ended');
+      setMessage('Звонок отклонён.');
+      window.setTimeout(() => setCallStatus('idle'), 1500);
     });
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {

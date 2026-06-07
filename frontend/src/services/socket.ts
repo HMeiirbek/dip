@@ -205,6 +205,11 @@ class SocketService {
     this.socket.on('call:accepted', callback);
   }
 
+  onCallRejected(callback: (data: { callId: string }) => void): void {
+    if (!this.socket) return;
+    this.socket.on('call:rejected', callback);
+  }
+
   onCallEnded(callback: (data: { callId: string; reason?: string; endedBy?: string | null }) => void): void {
     if (!this.socket) return;
     this.socket.on('call:ended', callback);
@@ -267,6 +272,11 @@ class SocketService {
   offCallAccepted(): void {
     if (!this.socket) return;
     this.socket.off('call:accepted');
+  }
+
+  offCallRejected(): void {
+    if (!this.socket) return;
+    this.socket.off('call:rejected');
   }
 
   offCallEnded(): void {

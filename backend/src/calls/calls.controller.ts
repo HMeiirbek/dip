@@ -130,13 +130,27 @@ export class CallsController {
     @Param('id') id: string,
   ) {
     const call = await this.calls.end(id, req.user.sub);
-    this.callEvents.emitEnded({
-      callId: call.id,
-      callerId: call.hostId || 'unknown',
-      calleeId: 'unknown',
-      reason: 'ended-by-user',
-      endedBy: req.user.sub,
-    });
+    const participantIds: string[] = (call as any).participantIds || [];
+    // Notify every participant that the call has ended
+    for (const pid of participantIds) {
+      this.callEvents.emitEnded({
+        callId: call.id,
+        callerId: call.hostId || 'unknown',
+        calleeId: pid === call.hostId ? 'unknown' : pid,
+        reason: 'ended-by-user',
+        endedBy: req.user.sub,
+      });
+    }
+    // Always also emit with the caller/callee pair from the room host
+    if (participantIds.length === 0) {
+      this.callEvents.emitEnded({
+        callId: call.id,
+        callerId: call.hostId || 'unknown',
+        calleeId: 'unknown',
+        reason: 'ended-by-user',
+        endedBy: req.user.sub,
+      });
+    }
     return call;
   }
 

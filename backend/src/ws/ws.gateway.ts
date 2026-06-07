@@ -59,7 +59,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       endedBy: endedBy || null,
     };
 
-    for (const userId of userIds) {
+    const uniqueIds = [...new Set(userIds.filter(id => id && id !== 'unknown'))];
+    for (const userId of uniqueIds) {
       const socketId = this.presence.getSocketIdByUserId(userId);
       if (socketId) {
         this.server.to(socketId).emit('call:ended', payload);
