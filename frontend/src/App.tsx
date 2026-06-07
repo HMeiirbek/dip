@@ -793,7 +793,7 @@ export const App: React.FC = () => {
               activeCall={activeCall}
               incomingCall={incomingCall}
               remoteUsername={remoteUsername}
-              canAcceptIncoming={incomingOfferReady}
+              canAcceptIncoming={callStatus === 'incoming'}
               onAccept={acceptCall}
               onReject={rejectCall}
               onEnd={endCall}
