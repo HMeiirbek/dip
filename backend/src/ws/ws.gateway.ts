@@ -77,10 +77,15 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private resolveCounterpartyUserId(
     call: any,
     senderId: string,
-  ) {
+    fallbackTargetUserId?: string,
+  ): string | null {
     if (call.hostId && call.participants) {
       if (call.hostId === senderId) {
-        return call.participants.find((p: any) => p.userId !== senderId)?.userId || null;
+        // Caller is host — find the first participant that isn't the host.
+        // If callee hasn't joined yet (no participant other than host), fall back
+        // to the explicitly requested targetUserId from the message.
+        const participantUserId = call.participants.find((p: any) => p.userId !== senderId)?.userId;
+        return participantUserId || fallbackTargetUserId || null;
       }
       return call.hostId;
     }
@@ -215,6 +220,10 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    if (!targetUserId) {
+      client.emit('error', { message: 'Callee is not online' });
+      return;
+    }
     const calleeSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!calleeSocketId) {
       // let the client know callee is offline; server-side create flow will still emit when callee reconnects
@@ -249,12 +258,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const targetUserId = this.resolveCounterpartyUserId(call, senderId);
-    const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
-    if (callerSocketId) {
-      this.logger.log(`Call rejected: ${data.callId}`);
-      this.server.to(callerSocketId).emit('call:rejected', {
-        callId: data.callId,
-      });
+    if (targetUserId) {
+      const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
+      if (callerSocketId) {
+        this.logger.log(`Call rejected: ${data.callId}`);
+        this.server.to(callerSocketId).emit('call:rejected', {
+          callId: data.callId,
+        });
+      }
     }
   }
 
@@ -277,12 +288,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     const targetUserId = this.resolveCounterpartyUserId(call, senderId);
-    const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
-    if (callerSocketId) {
-      this.logger.log(`Call accepted: ${data.callId}`);
-      this.server.to(callerSocketId).emit('call:accepted', {
-        callId: data.callId,
-      });
+    if (targetUserId) {
+      const callerSocketId = this.presence.getSocketIdByUserId(targetUserId);
+      if (callerSocketId) {
+        this.logger.log(`Call accepted: ${data.callId}`);
+        this.server.to(callerSocketId).emit('call:accepted', {
+          callId: data.callId,
+        });
+      }
     }
   }
 
@@ -305,14 +318,19 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     let call;
     try {
-      call = await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId, false);
     } catch (err) {
       this.logger.warn(`[WebRTC] Unauthorized offer: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId, data.targetUserId);
+    if (!targetUserId) {
+      this.logger.warn(`[WebRTC] Cannot resolve counterparty for offer: ${data.callId}`);
+      client.emit('error', { message: 'Cannot resolve target user for this call' });
+      return;
+    }
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       this.logger.warn(`[WebRTC] Target user offline for offer: ${targetUserId}`);
@@ -348,14 +366,19 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     let call;
     try {
-      call = await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId, false);
     } catch (err) {
       this.logger.warn(`[WebRTC] Unauthorized answer: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId, data.targetUserId);
+    if (!targetUserId) {
+      this.logger.warn(`[WebRTC] Cannot resolve counterparty for answer: ${data.callId}`);
+      client.emit('error', { message: 'Cannot resolve target user for this call' });
+      return;
+    }
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       this.logger.warn(`[WebRTC] Target user offline for answer: ${targetUserId}`);
@@ -391,14 +414,18 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     let call;
     try {
-      call = await this.callsService.findById(data.callId, senderId);
+      call = await this.callsService.findById(data.callId, senderId, false);
     } catch (err) {
       this.logger.warn(`[WebRTC] Unauthorized ICE: ${err?.message}`);
       client.emit('error', { message: 'Not authorized for this call' });
       return;
     }
 
-    const targetUserId = this.resolveCounterpartyUserId(call, senderId);
+    const targetUserId = this.resolveCounterpartyUserId(call, senderId, data.targetUserId);
+    if (!targetUserId) {
+      this.logger.debug(`[WebRTC] Cannot resolve counterparty for ICE, ignoring: ${data.callId}`);
+      return;
+    }
     const targetSocketId = this.presence.getSocketIdByUserId(targetUserId);
     if (!targetSocketId) {
       // Silently ignore if target is offline

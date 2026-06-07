@@ -40,7 +40,7 @@ export class CallsService {
     return room;
   }
 
-  async findById(id: string, userId: string) {
+  async findById(id: string, userId: string, strict = true) {
     const room = await this.prisma.room.findUnique({
       where: { id },
       include: {
@@ -54,10 +54,17 @@ export class CallsService {
     });
 
     if (!room) throw new NotFoundException('Room not found');
-    
-    const isParticipant = room.participants.some(p => p.userId === userId);
-    if (!isParticipant && room.hostId !== userId) {
-      throw new ForbiddenException('Not a participant of this room');
+
+    if (strict) {
+      // Allow host OR any registered participant to access the room.
+      // We intentionally do NOT reject callee who hasn't joined yet — that scenario
+      // is handled by the WebSocket gateway which resolves the counterparty from
+      // the participants list and host; the callee will join once they accept.
+      const isHost = room.hostId === userId;
+      const isParticipant = room.participants.some(p => p.userId === userId);
+      if (!isHost && !isParticipant) {
+        throw new ForbiddenException('Not a participant of this room');
+      }
     }
 
     return room;

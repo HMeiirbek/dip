@@ -15,13 +15,14 @@ import { SupportPanel } from './components/SupportPanel';
 import { useControlCenterData } from './hooks/useControlCenterData';
 
 import { TunnelShowcase } from './components/TunnelShowcase';
-import { sfuClient } from './services/sfu';
 import s from './App.module.css';
 import {
   User,
   Call,
   CallStatus as CallStatusType,
   RTCICECandidateData,
+  RTCOfferData,
+  RTCAnswerData,
 } from './types';
 import { Users, Phone, MessageCircle, Settings as SettingsIcon, Menu } from 'lucide-react';
 
@@ -29,6 +30,63 @@ const TrafficVisualizer = lazy(() => import('./components/admin/traffic/TrafficV
 
 type TabKey = 'contacts' | 'calls' | 'security' | 'risk' | 'chats' | 'support' | 'moderator' | 'admin' | 'traffic' | 'showcase';
 type ThemeMode = 'light' | 'dark';
+
+const parseCsv = (value?: string) =>
+  (value || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+const getIceServers = (): RTCIceServer[] => {
+  const json = process.env.REACT_APP_ICE_SERVERS_JSON;
+  if (json) {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch {
+      // fallback to env-based parsing below
+    }
+  }
+
+  const stunUrls = parseCsv(process.env.REACT_APP_STUN_URLS);
+  const turnUrls = parseCsv(process.env.REACT_APP_TURN_URLS);
+  const turnUsername = process.env.REACT_APP_TURN_USERNAME;
+  const turnCredential = process.env.REACT_APP_TURN_CREDENTIAL;
+
+  const servers: RTCIceServer[] = [];
+  if (stunUrls.length) {
+    servers.push({ urls: stunUrls });
+  } else {
+    servers.push({ urls: ['stun:stun.l.google.com:19302'] });
+  }
+
+  if (turnUrls.length && turnUsername && turnCredential) {
+    servers.push({
+      urls: turnUrls,
+      username: turnUsername,
+      credential: turnCredential,
+    });
+  } else {
+    // PUBLIC FALLBACK TURN SERVER for NAT Traversal (Carrier Grade NAT / LTE support)
+    // Used instantly when standard .env config is missing.
+    servers.push({
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    });
+  }
+
+  return servers;
+};
+
+const getIceTransportPolicy = (): RTCIceTransportPolicy => {
+  const value = `${process.env.REACT_APP_ICE_TRANSPORT_POLICY || 'all'}`.toLowerCase();
+  return value === 'relay' ? 'relay' : 'all';
+};
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('calls');
@@ -48,6 +106,7 @@ export const App: React.FC = () => {
   const activeCallRef = useRef<Call | null>(null);
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   const incomingCallRef = useRef<Call | null>(null);
+  const [incomingOfferReady, setIncomingOfferReady] = useState(false);
   const [remoteUsername, setRemoteUsername] = useState<string | null>(null);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -187,19 +246,6 @@ export const App: React.FC = () => {
       }
     };
     initializeAuth();
-
-    const handleStreamAdded = (peerId: string, stream: MediaStream) => {
-      setRemoteStreams(prev => {
-        const next = new Map(prev);
-        next.set(peerId, stream);
-        return next;
-      });
-    };
-    sfuClient.on('streamAdded', handleStreamAdded);
-
-    return () => {
-      sfuClient.off('streamAdded', handleStreamAdded);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -290,52 +336,87 @@ export const App: React.FC = () => {
   const setupWebRTC = async (
     call: Call,
     options?: { allowReceiveOnlyFallback?: boolean },
-  ): Promise<true | null | 'cancelled'> => {
+  ): Promise<RTCPeerConnection | null> => {
     try {
       let stream: MediaStream | null = null;
+      let receiveOnly = false;
+      const localUserId = currentUserRef.current?.id || currentUser?.id || '';
 
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('MediaDevices API unavailable.');
         }
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log('[SFU] Microphone acquired.');
+        console.log('[WebRTC][Diagnostic] Microphone acquired. Tracks:', stream.getAudioTracks().map(t => `${t.kind} (enabled=${t.enabled})`));
       } catch (mediaError) {
         if (!options?.allowReceiveOnlyFallback) {
           throw mediaError;
         }
-        setMessage('Microphone unavailable. Joining in listen-only mode.');
+        receiveOnly = true;
+        setMessage(
+          window.isSecureContext
+            ? 'Microphone unavailable. Joining in listen-only mode.'
+            : 'Microphone access is blocked on insecure HTTP. Joining in listen-only mode.',
+        );
       }
 
-      await sfuClient.joinRoom(call.id);
-
-      // If destroy() was called while joinRoom was running — clean abort
-      if (sfuClient.isDestroyed()) return 'cancelled';
+      const pc = new RTCPeerConnection({
+        iceServers: getIceServers(),
+        iceTransportPolicy: getIceTransportPolicy(),
+        iceCandidatePoolSize: 4,
+      });
 
       if (stream) {
-        const track = stream.getAudioTracks()[0];
-        if (track) {
-          await sfuClient.produce(track);
-        }
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
+      } else if (receiveOnly) {
+        pc.addTransceiver('audio', { direction: 'recvonly' });
       }
 
-      if (activeCallRef.current?.id) {
-        markCallActiveIfNeeded(activeCallRef.current.id).catch(console.error);
-      }
-      setCallStatus('active');
-      return true;
-    } catch (e: any) {
-      // AwaitQueueStoppedError = call was ended while SFU was setting up; not a real error
-      const isQueueStopped =
-        e?.name === 'AwaitQueueStoppedError' ||
-        e?.message?.includes('queue stopped') ||
-        e?.message === 'SFU is destroyed' ||
-        e?.message === 'SFU destroyed';
-      if (isQueueStopped) {
-        console.log('[SFU] Setup cancelled — call ended during connection.');
-        return 'cancelled';
-      }
-      console.error('Error setting up SFU:', e);
+      pc.ontrack = (event) => {
+        console.log('[WebRTC][Diagnostic] ontrack event received! TRACK:', event.track);
+        console.log('[WebRTC] setting remote stream for playback');
+        const newStream = new MediaStream([event.track]);
+        const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
+        setRemoteStreams(new Map([[remoteUserId, newStream]]));
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WebRTC] ICE Connection State:', pc.iceConnectionState);
+      };
+
+      pc.onicecandidate = (event) => {
+        if (!event.candidate) return;
+        const remoteUserId = call.callerId === localUserId ? call.calleeId : call.callerId;
+        socketService.sendICECandidate({
+          callId: call.id,
+          from: localUserId,
+          to: remoteUserId,
+          candidate: event.candidate.toJSON(),
+        });
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          if (activeCallRef.current?.id) {
+            markCallActiveIfNeeded(activeCallRef.current.id).catch((e) => {
+              console.error('Failed to mark call active:', e);
+            });
+          }
+          setCallStatus('active');
+          return;
+        }
+
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          setCallStatus('ended');
+          stopQualityReporter();
+          endCall();
+        }
+      };
+
+      peerConnectionRef.current = pc;
+      return pc;
+    } catch (e) {
+      console.error('Error setting up WebRTC:', e);
       setCallStatus('error');
       return null;
     }
@@ -350,11 +431,17 @@ export const App: React.FC = () => {
   };
 
   const resetRtcState = () => {
-    sfuClient.destroy();
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.getSenders().forEach((sender) => {
+        sender.track?.stop();
+      });
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
     setRemoteStreams(new Map());
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
-
+    setIncomingOfferReady(false);
   };
 
   const collectQualitySample = async (pc: RTCPeerConnection) => {
@@ -452,35 +539,64 @@ export const App: React.FC = () => {
   const acceptCall = async () => {
     if (!incomingCall || !currentUser) return;
 
-    const callId = incomingCall.id;
     try {
-      console.log('[Calls] Accepting call:', callId);
+      console.log('[Calls] Accepting call:', incomingCall.id);
       setCallStatus('calling');
-      
-      await apiService.acceptCall(callId);
-
-      const joined = await setupWebRTC(incomingCall, {
+      const pc = await setupWebRTC(incomingCall, {
         allowReceiveOnlyFallback: true,
       });
-
-      // 'cancelled' means the call was ended by the other side during SFU setup — UI already reset
-      if (joined === 'cancelled') {
-        console.log('[Calls] SFU setup cancelled — call was ended remotely during accept.');
+      if (!pc) {
+        console.error('[Calls] Failed to setup WebRTC for accepting call');
+        setCallStatus('incoming');
+        setErrorMessage(
+          window.isSecureContext
+            ? 'Unable to initialize WebRTC audio on this device.'
+            : 'On mobile browsers microphone access requires HTTPS or localhost. Open the app through a secure tunnel.',
+        );
         return;
       }
 
-      if (!joined) {
-        console.error('[Calls] Failed to setup SFU for accepting call');
-        // Only show error if the call wasn't already ended from the outside
-        if (callStatus !== 'idle' && callStatus !== 'ended') {
-          setCallStatus('incoming');
-          setErrorMessage('Unable to initialize WebRTC audio on this device.');
+      if (!pendingOfferRef.current) {
+        console.warn('[Calls] No pending offer to accept');
+        setMessage('Waiting for call signaling...');
+        setCallStatus('incoming');
+        return;
+      }
+
+      console.log('[Calls] Setting remote description...');
+      await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
+      pendingOfferRef.current = null;
+
+      console.log('[Calls] Adding pending ICE candidates...');
+      while (pendingIceCandidatesRef.current.length > 0) {
+        const candidate = pendingIceCandidatesRef.current.shift();
+        if (candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('[Calls] Failed to add queued ICE candidate', e);
+          }
         }
-        return;
       }
+
+      console.log('[Calls] Creating answer...');
+      const answer = await pc.createAnswer();
+      console.log('[Calls] Answer created, SDP starts with:', answer.sdp?.substring(0, 50));
+      await pc.setLocalDescription(answer);
+
+      console.log('[Calls] Updating call status in DB...');
+      await apiService.acceptCall(incomingCall.id);
+
+      console.log('[Calls] Sending answer via socket...');
+      socketService.sendAnswer({
+        callId: incomingCall.id,
+        from: currentUser.id,
+        to: incomingCall.callerId,
+        answer: answer as RTCSessionDescriptionInit,
+      });
 
       const callObj: Call = {
-        id: callId,
+        id: incomingCall.id,
         callerId: incomingCall.callerId,
         calleeId: currentUser.id,
         status: 'accepted',
@@ -511,7 +627,7 @@ export const App: React.FC = () => {
     }
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
-
+    setIncomingOfferReady(false);
     incomingCallRef.current = null;
     setIncomingCall(null);
     setCallStatus('idle');
@@ -526,15 +642,36 @@ export const App: React.FC = () => {
     }
   };
 
-  const startOutgoingCall = async (calleeId: string) => {
+  const startOutgoingCall = async (calleeId: string, currentUserId: string) => {
     assertWebRTCAvailable();
     console.log('[Calls] Starting outgoing call to:', calleeId);
     const call = await apiService.createCall(calleeId);
     console.log('[Calls] Call created:', call.id);
     activeCallRef.current = call;
     setActiveCall(call);
-    // Do NOT join SFU room yet — wait for callee to accept first
-    // SFU join happens in onCallAccepted handler
+
+    const pc = await setupWebRTC(call);
+    if (!pc) {
+      console.error('[Calls] Failed to setup WebRTC');
+      await apiService.endCall(call.id);
+      activeCallRef.current = null;
+      setActiveCall(null);
+      return;
+    }
+
+    console.log('[Calls] Creating offer...');
+    const offer = await pc.createOffer();
+    console.log('[Calls] Offer created, SDP starts with:', offer.sdp?.substring(0, 50));
+    console.log('[Calls] Setting local description...');
+    await pc.setLocalDescription(offer);
+
+    console.log('[Calls] Sending offer...');
+    socketService.sendOffer({
+      callId: call.id,
+      from: currentUserId,
+      to: calleeId,
+      offer: offer as RTCSessionDescriptionInit,
+    });
   };
 
   const releaseConflictingCall = async (calleeId: string, currentUserId: string): Promise<boolean> => {
@@ -570,14 +707,14 @@ export const App: React.FC = () => {
       setCallStatus('calling');
       const callee = await getUserDetails(calleeId);
       if (callee) setRemoteUsername(callee.username);
-      await startOutgoingCall(calleeId);
+      await startOutgoingCall(calleeId, currentUser.id);
     } catch (e: unknown) {
       const maybeAxios = e as { response?: { data?: { message?: string } } };
       const message = maybeAxios?.response?.data?.message;
       if (message === 'There is already an active call between these users') {
         const released = await releaseConflictingCall(calleeId, currentUser.id);
         if (released) {
-          await startOutgoingCall(calleeId);
+          await startOutgoingCall(calleeId, currentUser.id);
           return;
         }
       }
@@ -636,7 +773,7 @@ export const App: React.FC = () => {
       if (activeCallRef.current || incomingCallRef.current?.id === data.callId) {
         return;
       }
-
+      setIncomingOfferReady(false);
       await handleIncomingCall({
         id: data.callId,
         from: data.from,
@@ -644,40 +781,44 @@ export const App: React.FC = () => {
       });
     });
 
-    socketService.onOffer(async () => {
-      // Unused in SFU
-    });
+    socketService.onOffer(async (data: RTCOfferData) => {
+      if (!currentUserRef.current) return;
+      pendingOfferRef.current = data.offer;
+      pendingIceCandidatesRef.current = [];
+      setIncomingOfferReady(true);
 
-    socketService.onAnswer(async () => {
-      // Unused in SFU
-    });
+      const caller = await getUserDetails(data.from);
+      if (caller) setRemoteUsername(caller.username);
 
-    socketService.onCallAccepted(async (data: { callId: string }) => {
-      const call = activeCallRef.current;
-      if (!call || call.id !== data.callId) return;
-      console.log('[Calls] Call accepted by callee, joining SFU room:', data.callId);
-      const joined = await setupWebRTC(call);
-      if (!joined) {
-        console.error('[Calls] Failed to setup SFU after acceptance');
-        try { await apiService.endCall(call.id); } catch {}
-        activeCallRef.current = null;
-        setActiveCall(null);
-        setCallStatus('error');
-        setErrorMessage('Failed to establish audio connection.');
-        return;
+      if (incomingCallRef.current?.id !== data.callId) {
+        handleIncomingCall({ id: data.callId, from: data.from, to: data.to });
+      } else {
+        setCallStatus('incoming');
+        setActiveTab('calls');
       }
-      setCallStatus('active');
     });
 
-    socketService.onCallRejected((data: { callId: string }) => {
-      if (activeCallRef.current?.id !== data.callId) return;
-      resetRtcState();
-      activeCallRef.current = null;
-      setActiveCall(null);
-      setRemoteUsername(null);
-      setCallStatus('ended');
-      setMessage('Звонок отклонён.');
-      window.setTimeout(() => setCallStatus('idle'), 1500);
+    socketService.onAnswer(async (data: RTCAnswerData) => {
+      if (!peerConnectionRef.current) return;
+      try {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+        while (pendingIceCandidatesRef.current.length > 0) {
+          const candidate = pendingIceCandidatesRef.current.shift();
+          if (candidate) {
+            try {
+              await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch(e) {
+              console.error('[Calls] Failed to add queued ICE candidate on answer', e);
+            }
+          }
+        }
+        if (activeCallRef.current) {
+          await markCallActiveIfNeeded(activeCallRef.current.id);
+        }
+        setCallStatus('active');
+      } catch (e) {
+        console.error(e);
+      }
     });
 
     socketService.onICECandidate(async (data: RTCICECandidateData) => {
@@ -708,6 +849,17 @@ export const App: React.FC = () => {
       setCallStatus('ended');
       setMessage(`Call ended: ${data.reason || 'remote end'}`);
       window.setTimeout(() => setCallStatus('idle'), 1200);
+    });
+
+    socketService.onCallRejected((data: { callId: string }) => {
+      if (activeCallRef.current?.id !== data.callId) return;
+      resetRtcState();
+      activeCallRef.current = null;
+      setActiveCall(null);
+      setRemoteUsername(null);
+      setCallStatus('ended');
+      setMessage('Звонок отклонён.');
+      window.setTimeout(() => setCallStatus('idle'), 1500);
     });
 
     moderationPresenceListenerRef.current = () => {
@@ -843,7 +995,7 @@ export const App: React.FC = () => {
               activeCall={activeCall}
               incomingCall={incomingCall}
               remoteUsername={remoteUsername}
-              canAcceptIncoming={callStatus === 'incoming'}
+              canAcceptIncoming={callStatus === 'incoming' && incomingOfferReady}
               onAccept={acceptCall}
               onReject={rejectCall}
               onEnd={endCall}
