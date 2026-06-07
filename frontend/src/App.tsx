@@ -57,7 +57,7 @@ export const App: React.FC = () => {
   const moderationPresenceListenerRef = useRef<((data: { onlineCount: number; at: string }) => void) | null>(null);
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const [incomingOfferReady, setIncomingOfferReady] = useState(false);
+
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
 
   const [notice, setNotice] = useState<string>('');
@@ -341,7 +341,7 @@ export const App: React.FC = () => {
     setRemoteStreams(new Map());
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
-    setIncomingOfferReady(false);
+
   };
 
   const collectQualitySample = async (pc: RTCPeerConnection) => {
@@ -488,7 +488,7 @@ export const App: React.FC = () => {
     }
     pendingOfferRef.current = null;
     pendingIceCandidatesRef.current = [];
-    setIncomingOfferReady(false);
+
     incomingCallRef.current = null;
     setIncomingCall(null);
     setCallStatus('idle');
@@ -608,7 +608,7 @@ export const App: React.FC = () => {
       if (activeCallRef.current || incomingCallRef.current?.id === data.callId) {
         return;
       }
-      setIncomingOfferReady(false);
+
       await handleIncomingCall({
         id: data.callId,
         from: data.from,
