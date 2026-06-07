@@ -290,7 +290,7 @@ export const App: React.FC = () => {
   const setupWebRTC = async (
     call: Call,
     options?: { allowReceiveOnlyFallback?: boolean },
-  ) => {
+  ): Promise<true | null | 'cancelled'> => {
     try {
       let stream: MediaStream | null = null;
 
@@ -309,6 +309,9 @@ export const App: React.FC = () => {
 
       await sfuClient.joinRoom(call.id);
 
+      // If destroy() was called while joinRoom was running — clean abort
+      if (sfuClient.isDestroyed()) return 'cancelled';
+
       if (stream) {
         const track = stream.getAudioTracks()[0];
         if (track) {
@@ -321,7 +324,17 @@ export const App: React.FC = () => {
       }
       setCallStatus('active');
       return true;
-    } catch (e) {
+    } catch (e: any) {
+      // AwaitQueueStoppedError = call was ended while SFU was setting up; not a real error
+      const isQueueStopped =
+        e?.name === 'AwaitQueueStoppedError' ||
+        e?.message?.includes('queue stopped') ||
+        e?.message === 'SFU is destroyed' ||
+        e?.message === 'SFU destroyed';
+      if (isQueueStopped) {
+        console.log('[SFU] Setup cancelled — call ended during connection.');
+        return 'cancelled';
+      }
       console.error('Error setting up SFU:', e);
       setCallStatus('error');
       return null;
@@ -439,25 +452,35 @@ export const App: React.FC = () => {
   const acceptCall = async () => {
     if (!incomingCall || !currentUser) return;
 
+    const callId = incomingCall.id;
     try {
-      console.log('[Calls] Accepting call:', incomingCall.id);
+      console.log('[Calls] Accepting call:', callId);
       setCallStatus('calling');
       
-      await apiService.acceptCall(incomingCall.id);
+      await apiService.acceptCall(callId);
 
       const joined = await setupWebRTC(incomingCall, {
         allowReceiveOnlyFallback: true,
       });
 
+      // 'cancelled' means the call was ended by the other side during SFU setup — UI already reset
+      if (joined === 'cancelled') {
+        console.log('[Calls] SFU setup cancelled — call was ended remotely during accept.');
+        return;
+      }
+
       if (!joined) {
         console.error('[Calls] Failed to setup SFU for accepting call');
-        setCallStatus('incoming');
-        setErrorMessage('Unable to initialize WebRTC audio on this device.');
+        // Only show error if the call wasn't already ended from the outside
+        if (callStatus !== 'idle' && callStatus !== 'ended') {
+          setCallStatus('incoming');
+          setErrorMessage('Unable to initialize WebRTC audio on this device.');
+        }
         return;
       }
 
       const callObj: Call = {
-        id: incomingCall.id,
+        id: callId,
         callerId: incomingCall.callerId,
         calleeId: currentUser.id,
         status: 'accepted',

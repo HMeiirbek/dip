@@ -23,11 +23,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
       let authResponse;
       if (isRegister) {
         // Password validation matching backend rules
-        const hasUpperCase = /[A-ZА-Я]/.test(password);
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
         const hasNumber = /[0-9]/.test(password);
-        const hasSpecialChar = /[^a-zA-Z0-9]/.test(password);
-        if (password.length < 8 || !hasUpperCase || !hasNumber || !hasSpecialChar) {
-          const errMsg = 'Пароль должен быть от 8 символов, содержать заглавную букву, цифру и спецсимвол.';
+        const hasSpecialChar = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+        if (password.length < 8 || !hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+          const errMsg = 'Пароль должен быть от 8 символов, содержать заглавную и строчную латинские буквы, цифру и спецсимвол (!@#$%^&*...).';
           setLocalError(errMsg);
           onError?.(errMsg);
           setIsLoading(false);
@@ -54,9 +55,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onError }) => {
       const status = error.response?.status;
       const errorMessage =
         status === 401
-          ? 'Invalid username or password'
+          ? 'Неверный логин или пароль'
           : status === 429
-          ? 'Too many login attempts. Please try again later.'
+          ? 'Слишком много попыток входа. Пожалуйста, попробуйте позже.'
           : status === 502 || status === 503 || status === 504
           ? 'Сервер временно недоступен. Попробуйте позже.'
           : error.response?.data?.message ||

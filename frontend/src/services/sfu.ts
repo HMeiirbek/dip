@@ -103,37 +103,62 @@ class SfuClientService {
     });
   }
 
+  public isDestroyed(): boolean {
+    return this.destroyed;
+  }
+
   public async produce(track: MediaStreamTrack) {
     if (this.destroyed) throw new Error('SFU is destroyed');
     if (!this.sendTransport) throw new Error('Send transport not initialized');
-    const producer = await this.sendTransport.produce({ track });
-    return producer;
+    try {
+      const producer = await this.sendTransport.produce({ track });
+      return producer;
+    } catch (e: any) {
+      if (
+        e?.name === 'AwaitQueueStoppedError' ||
+        e?.message?.includes('queue stopped')
+      ) {
+        throw new Error('SFU is destroyed');
+      }
+      throw e;
+    }
   }
 
   public async consume(producerId: string, peerId: string) {
     if (this.destroyed) throw new Error('SFU is destroyed');
     if (!this.recvTransport || !this.device) throw new Error('Recv transport not initialized');
 
-    const { id, kind, rtpParameters } = await this.request('consume', {
-      transportId: this.recvTransport.id,
-      producerId,
-      rtpCapabilities: this.device.rtpCapabilities,
-    });
+    try {
+      const { id, kind, rtpParameters } = await this.request('consume', {
+        transportId: this.recvTransport.id,
+        producerId,
+        rtpCapabilities: this.device.rtpCapabilities,
+      });
 
-    const consumer = await this.recvTransport.consume({
-      id,
-      producerId,
-      kind,
-      rtpParameters,
-    });
+      const consumer = await this.recvTransport.consume({
+        id,
+        producerId,
+        kind,
+        rtpParameters,
+      });
 
-    // Store the remote stream
-    const stream = new MediaStream([consumer.track]);
-    this.remoteStreams.set(peerId, stream);
-    this.emit('streamAdded', peerId, stream);
+      // Store the remote stream
+      const stream = new MediaStream([consumer.track]);
+      this.remoteStreams.set(peerId, stream);
+      this.emit('streamAdded', peerId, stream);
 
-    return consumer;
+      return consumer;
+    } catch (e: any) {
+      if (
+        e?.name === 'AwaitQueueStoppedError' ||
+        e?.message?.includes('queue stopped')
+      ) {
+        throw new Error('SFU is destroyed');
+      }
+      throw e;
+    }
   }
+
 
   private destroyTransports() {
     try { if (this.sendTransport) this.sendTransport.close(); } catch {}

@@ -5,6 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 
+if (!globalThis.crypto) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: require('crypto').webcrypto || require('crypto'),
+    writable: false,
+    configurable: true,
+  });
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   

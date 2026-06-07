@@ -279,5 +279,23 @@ export class CallsService {
     });
   }
   async markActive(id: string, userId: string) { return { id, status: 'active' }; }
-  async reject(id: string, userId: string) { return { id, status: 'rejected' }; }
+  async reject(id: string, userId: string) {
+    const room = await this.prisma.room.findUnique({
+      where: { id },
+    });
+    if (!room) throw new NotFoundException('Room not found');
+
+    if (room.status === 'ended' || room.status === 'rejected') {
+      return room;
+    }
+
+    const updated = await this.prisma.room.update({
+      where: { id },
+      data: {
+        status: 'rejected',
+        endedAt: new Date(),
+      },
+    });
+    return updated;
+  }
 }
